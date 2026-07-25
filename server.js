@@ -1,6 +1,6 @@
 // ============================================
 // RAILWAY GATEWAY - 100000000000% UNIVERSAL DIRECT CONNECT
-// FIX ROUTING PATH LOGIC + UI DDFATHUVLES MURNI
+// MURNI SCRIPT BAWAAN LU - HANYA GANTI TAMPILAN UI DDFATHUVLES
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -37,7 +37,6 @@ class GatewayServer {
     if (req.method === 'OPTIONS') { res.writeHead(200, this.CORS_HEADER_OPTIONS); res.end(); return; }
     if (parsedUrl.pathname === '/health') { this.handleHealthCheck(req, res); return; }
     
-    // KUNCI UTAMA: Cuma respon jika user akses landing page utama "/" via browser
     if (parsedUrl.pathname === '/') {
       const currentHost = req.headers.host || 'localhost:8080';
       const uptime = Math.floor(process.uptime());
@@ -246,17 +245,9 @@ class GatewayServer {
       return;
     }
     
-    // Proteksi Tambahan: Jalur Reverse Proxy luar hanya jalan jika variable tersetting, jika tidak lewati saja agar WS bisa jabat tangan
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx && parsedUrl.pathname !== '/DIREK') { 
-      this.reverseWeb(req, res, targetReversePrx); 
-    } else {
-      // Jika request adalah handshake WebSocket untuk VPN, biarkan menggantung agar dihandle server.wss
-      if (req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket') {
-        return; 
-      }
-      res.writeHead(404); res.end('Not Found');
-    }
+    if (targetReversePrx) { this.reverseWeb(req, res, targetReversePrx); } 
+    else { res.writeHead(404); res.end('Not Found'); }
   }
 
   async reverseWeb(request, response, target) {
@@ -276,7 +267,7 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET HANDLERS ====================
+  // ==================== WEBSOCKET HANDLERS (UNIVERSAL ASLI MULTI-PROTOCOL) ====================
   async handleWebSocketConnection(ws, request) {
     await this.websocketHandler(ws);
   }
