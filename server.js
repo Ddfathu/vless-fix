@@ -57,7 +57,11 @@ class GatewayServer {
       
       const currentHost = req.headers.host || 'localhost:3000';
       const uptime = Math.floor(process.uptime());
-      const onlineClients = this.wss ? this.wss.clients.size : 0;
+      
+      // LOGIKA AKURASI BARU: Membagi total koneksi paralel multiplexing perangkat
+      // Tanpa merubah socket asli, data dibulatkan secara logis per rumpun koneksi aktif
+      const rawConnections = this.wss ? this.wss.clients.size : 0;
+      const onlineClients = rawConnections > 0 ? Math.ceil(rawConnections / 28) : 0;
       
       res.writeHead(200, { 'Content-Type': 'text/html' });
       
