@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - FULL COMPLETE (HYBRID SYSTEM FIX)
+// RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -7,69 +7,42 @@
 const WebSocket = require('ws');
 const net = require('net');
 const dgram = require('dgram');
-const fetch = require('node-fetch');
 const http = require('http');
 const https = require('https');
 const url = require('url');
 
-// ==================== CUSTOM PROXY HARDCODE ====================
-const CUSTOM_PROXY = {
-  "SG-GL": ["34.143.159.175:443"],
-  "ID-PUSAT": ["103.6.207.108:8080"],
-  "SG-OVH": ["51.79.158.58:8443"],
-  "SG-DO": ["178.128.80.43:443"],
-  "SG-MELBI": ["91.192.81.154:2053"],
-  "US-DO": ["167.172.234.12:443", "159.203.182.32:2053"],
-  "SG-LINODE": ["139.162.41.196:443", "172.104.188.34:2083"],
-  "JP-AWS": ["18.179.45.123:443", "52.194.12.34:8443"],
-  "SG-GCP": ["35.197.120.15:443", "34.87.112.45:8080"],
-  "G-SG": ["178.128.80.43:443", "91.192.81.154:2053", "51.79.158.58:8443", "34.143.159.175:443"],
-  "G-US": ["167.172.234.12:443", "159.203.182.32:2053", "45.79.120.99:8080"],
-  "G-JP": ["18.179.45.123:443", "52.194.12.34:8443", "54.95.120.33:2053"],
-  "G-PREMIUM": ["178.128.80.43:443", "91.192.81.154:2053", "18.179.45.123:443", "167.172.234.12:443"],
-  "G-STREAMING": ["51.79.158.58:8443", "34.143.159.175:443", "139.162.41.196:443"],
-  "G-ID": ["103.253.146.10:443", "45.32.100.100:8443", "149.28.200.50:443"]
-};
-
 // Constants
-const horse = Buffer.from("dHJvamFu", 'base64').toString(); 
-const flash = Buffer.from("dm1lc3M=", 'base64').toString(); 
-const v2 = Buffer.from("djJyYXk=", 'base64').toString(); 
-const neko = Buffer.from("Y2xhc2g=", 'base64').toString(); 
+const horse = Buffer.from("dHJvamFu", 'base64').toString(); // "trojan"
+const flash = Buffer.from("dm1lc3M=", 'base64').toString(); // "vmess"
+const v2 = Buffer.from("djJyYXk=", 'base64').toString(); // "v2ray"
+const neko = Buffer.from("Y2xhc2g=", 'base64').toString(); // "clash"
 
-const KV_PRX_URL = "https://raw.githubusercontent.com/backup-heavenly-demons/gateway/refs/heads/main/kvProxyList.json";
-const DNS_SERVER_ADDRESS = "8.8.8.8";
-const DNS_SERVER_PORT = 53;
-const WS_READY_STATE_OPEN = 1;
-const WS_READY_STATE_CLOSING = 2;
 const CORS_HEADER_OPTIONS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,HEAD,POST,OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
 
-const REGION_MAP = {
-  ASIA: ["ID", "SG", "MY", "PH", "TH", "VN", "JP", "KR", "CN", "HK", "TW"],
-  GLOBAL: []
-};
-
 class GatewayServer {
   constructor() {
-    this.prxIP = "";
-    this.cachedPrxList = [];
     this.wss = null;
     this.httpServer = null;
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
-    this.isDirectRoute = false;
-    this.fullFirstChunkBackup = null; // Penampung paket data utuh awal
-    this.currentWsIncomingReq = null;
   }
 
   // ==================== HTTP HANDLERS & UI ====================
   handleHealthCheck(req, res) {
+    const healthData = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      service: 'railway-gateway',
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      features: { websocket: true, tcp: true, udp: true }
+    };
     res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
-    res.end(JSON.stringify({ status: 'healthy', uptime: process.uptime() }));
+    res.end(JSON.stringify(healthData, null, 2));
   }
 
   async handleHttpRequest(req, res) {
@@ -80,46 +53,59 @@ class GatewayServer {
     if (parsedUrl.pathname === '/') {
       const currentHost = req.headers.host || 'localhost:3000';
       const protocolWs = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws';
+      const uptime = Math.floor(process.uptime());
+      const ramUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+      const nodeVersion = process.version;
+      
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<html><body style="background:#0a0b10;color:#fff;font-family:monospace;padding:20px;">
-        <h2>RAILWAY GATEWAY // HYBRID REPAIRED</h2>
-        <p>Direct Path: ${protocolWs}://${currentHost}/DIREK</p>
-        <p>Proxy Path: ${protocolWs}://${currentHost}/G-SG atau ${protocolWs}://${currentHost}/ALL</p>
-      </body></html>`);
+      res.end(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAILWAY GATEWAY // UNIVERSAL DASHBOARD</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+    body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
+    .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
+  </style>
+</head>
+<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6">
+  <header class="border-b border-slate-900 pb-4 flex justify-between items-center max-w-7xl w-full mx-auto">
+    <div>
+      <h1 class="text-xl font-bold text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
+      <p class="text-xs text-slate-500 font-bold text-emerald-400">UNIVERSAL PATH MODE ACTIVE (ALL PATHS CONNECT TO DIRECT)</p>
+    </div>
+    <div class="text-xs font-semibold text-emerald-400 bg-[#121420] px-4 py-2 rounded border border-blue-500/20">SYSTEM ONLINE</div>
+  </header>
+  <main class="max-w-7xl w-full mx-auto my-8 space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
+        <h2 class="text-white font-bold">UNIVERSAL WEBSOCKET ENDPOINT</h2>
+        <p class="text-sm text-slate-300">Kamu bebas menggunakan path kata apa saja di aplikasi VPN, semuanya otomatis terhubung lurus (DIREK) menggunakan internet speed dewa dari server Railway!</p>
+        <p class="text-xs text-emerald-400 mt-2 font-bold">Contoh: ${protocolWs}://${currentHost}/BebasApaSaja</p>
+      </div>
+      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
+        <h2 class="text-white font-bold">MONITOR CORE</h2>
+        <p class="text-xs text-slate-400">Uptime: ${uptime}s | Allocation RAM: ${ramUsed} MB</p>
+        <p class="text-xs text-slate-400">Engine Node: ${nodeVersion}</p>
+      </div>
+    </div>
+  </main>
+  <footer class="text-center text-xs text-slate-600 border-t border-slate-900 pt-4">&copy; 2026 RAILWAY GATEWAY TERMINAL.</footer>
+</body>
+</html>`);
       return;
     }
-
+    
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx) { this.reverseWeb(req, res, targetReversePrx); } 
+    if (targetReversePrx) { await this.reverseWeb(req, res, targetReversePrx); } 
     else { res.writeHead(404); res.end('Not Found'); }
   }
 
-  async getKVPrxList(kvPrxUrl = KV_PRX_URL) {
-    try {
-      const kvPrx = await fetch(kvPrxUrl);
-      if (kvPrx.status == 200) return await kvPrx.json();
-      return {};
-    } catch (error) { return {}; }
-  }
-
-  async getPrxList(prxBankUrl) {
-    if (!prxBankUrl) return [];
-    try {
-      const response = await fetch(prxBankUrl);
-      if (response.status === 200) {
-        const data = await response.json();
-        if (!Array.isArray(data)) return [];
-        return data.map(proxy => ({
-          prxIP: proxy.prxIP || proxy.ip || proxy.server,
-          prxPort: proxy.prxPort || proxy.port,
-          country: (proxy.country || proxy.cc || 'XX').toUpperCase()
-        })).filter(p => p.prxIP && p.prxPort);
-      }
-      return [];
-    } catch (error) { return []; }
-  }
-
-  async reverseWeb(request, response, target) {
+  async reverseWeb(request, response, target, targetPath) {
     try {
       const targetUrl = new URL(request.url);
       const targetChunk = target.split(":");
@@ -127,7 +113,7 @@ class GatewayServer {
       targetUrl.port = targetChunk[1] || "443";
       const options = {
         hostname: targetUrl.hostname, port: targetUrl.port,
-        path: targetUrl.pathname + targetUrl.search, method: request.method,
+        path: (targetPath || targetUrl.pathname) + targetUrl.search, method: request.method,
         headers: { ...request.headers, host: targetUrl.hostname }
       };
       const proxyReq = https.request(options, (proxyRes) => {
@@ -139,50 +125,9 @@ class GatewayServer {
 
   // ==================== WEBSOCKET HANDLERS ====================
   async handleWebSocketConnection(ws, request) {
-    try {
-      const parsedUrl = url.parse(request.url, true);
-      const path = parsedUrl.pathname;
-      console.log(`WebSocket request path: ${path}`);
-      
-      this.isDirectRoute = false;
-      this.currentWsIncomingReq = request;
-
-      if (path.toUpperCase() === '/DIREK') {
-        this.isDirectRoute = true;
-        this.prxIP = "";
-        await this.websocketHandler(ws); return;
-      }
-
-      const customMatch = path.match(/^\/([A-Z0-9]{2,3}-[A-Za-z0-9_]+)$/i);
-      if (customMatch) {
-        const customKey = customMatch[1].toUpperCase();
-        if (CUSTOM_PROXY[customKey] && CUSTOM_PROXY[customKey].length > 0) {
-          const list = CUSTOM_PROXY[customKey];
-          this.prxIP = list[Math.floor(Math.random() * list.length)];
-          console.log(`Hardcode Match: ${this.prxIP}`);
-          await this.websocketHandler(ws); return;
-        }
-      }
-
-      const proxies = await this.getPrxList(process.env.PRX_BANK_URL);
-      if (proxies.length === 0) {
-        const kvPrx = await this.getKVPrxList();
-        const countryCode = path.replace("/", "").toUpperCase();
-        if (kvPrx[countryCode] && kvPrx[countryCode].length > 0) {
-          this.prxIP = kvPrx[countryCode][Math.floor(Math.random() * kvPrx[countryCode].length)];
-        } else {
-          const allProxies = Object.values(kvPrx).flat();
-          this.prxIP = allProxies.length > 0 ? allProxies[Math.floor(Math.random() * allProxies.length)] : "";
-        }
-      } else {
-        const countryCode = path.replace("/", "").toUpperCase();
-        const filtered = proxies.filter(p => p.country === countryCode);
-        this.prxIP = filtered.length > 0 ? `${filtered[0].prxIP}:${filtered[0].prxPort}` : `${proxies[0].prxIP}:${proxies[0].prxPort}`;
-      }
-
-      console.log(`Selected Target Proxy: ${this.prxIP}`);
-      await this.websocketHandler(ws);
-    } catch (err) { ws.close(1011); }
+    // Kunci Utama Universal Path: Semua path langsung diizinkan masuk dan diproses
+    console.log(`WebSocket universal handshake connected via path: ${url.parse(request.url).pathname}`);
+    await this.websocketHandler(ws);
   }
 
   async websocketHandler(ws) {
@@ -193,18 +138,7 @@ class GatewayServer {
     ws.on('message', async (message) => {
       try {
         const chunk = Buffer.from(message);
-        
-        if (remoteSocketWrapper.value) {
-          if (remoteSocketWrapper.value instanceof WebSocket) {
-            if (remoteSocketWrapper.value.readyState === WebSocket.OPEN) remoteSocketWrapper.value.send(chunk);
-          } else {
-            remoteSocketWrapper.value.write(chunk);
-          }
-          return;
-        }
-
-        // BACKUP PAKET UTUH AWAL DARI DARK TUNNEL (Kunci Lolos Handshake Luar)
-        this.fullFirstChunkBackup = chunk;
+        if (remoteSocketWrapper.value) { remoteSocketWrapper.value.write(chunk); return; }
 
         const protocol = await this.protocolSniffer(chunk);
         let protocolHeader;
@@ -228,13 +162,7 @@ class GatewayServer {
       }
     });
 
-    ws.on('close', () => {
-      if (remoteSocketWrapper.value) {
-        if (remoteSocketWrapper.value instanceof WebSocket) remoteSocketWrapper.value.close();
-        else remoteSocketWrapper.value.end();
-      }
-      this.cleanupUDPConnections(ws);
-    });
+    ws.on('close', () => { if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); this.cleanupUDPConnections(ws); });
     ws.on('error', () => this.cleanupUDPConnections(ws));
   }
 
@@ -248,66 +176,19 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== CORE TCP FORWARDING FIX FOR PROXY WORKER ====================
+  // ==================== PURE DIRECT OUTBOUND GENERATION ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
-    const connectAndWrite = (address, port, dataToSend) => new Promise((resolve, reject) => {
-      const s = net.createConnection({ host: address, port }, () => { log(`TCP dial-out to ${address}:${port}`); s.write(dataToSend); resolve(s); });
-      s.on('error', reject);
-    });
-    
-    // JIKA /DIREK: Jalankan TCP Outbound polosan bawaan asli temanmu langsung ke internet
-    if (this.isDirectRoute || !this.prxIP) {
-      try {
-        const s = await connectAndWrite(addressRemote, portRemote, rawClientData);
-        remoteSocket.value = s;
-        s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
-        this.remoteSocketToWS(s, webSocket, responseHeader, null, log);
-      } catch (e) { webSocket.close(); }
-      return;
-    }
-
-    // JIKA LEWAT PATH PROXY: Bikin WebSocket baru ke Worker luar, lalu kirim paket UTUH (fullFirstChunkBackup)
+    // 100% Langsung dilarikan lurus keluar menggunakan internet server Railway
     try {
-      const [proxyHost, proxyPort] = this.prxIP.split(/[:=-]/);
-      const isPortTls = proxyPort == "443" || proxyPort == "8443" || proxyPort == "2053";
-      const targetWsUrl = `${isPortTls ? 'wss' : 'ws'}://${proxyHost}:${proxyPort}${this.currentWsIncomingReq.url}`;
-      
-      log(`Proxy Mode Engaged -> Connecting client WS to Target: ${targetWsUrl}`);
-
-      const forwardHeaders = { ...this.currentWsIncomingReq.headers };
-      delete forwardHeaders.host;
-      delete forwardHeaders.connection;
-      delete forwardHeaders.upgrade;
-
-      const outboundWs = new WebSocket(targetWsUrl, {
-        headers: forwardHeaders,
-        rejectUnauthorized: false
+      const s = net.createConnection({ host: addressRemote, port: portRemote }, () => {
+        log(`pure direct connection established to ${addressRemote}:${portRemote}`);
+        s.write(rawClientData);
       });
-
-      remoteSocket.value = outboundWs;
-
-      outboundWs.on('open', () => {
-        log(`WS Outbound to Proxy Worker established! Sending full VLESS header payload...`);
-        // KIRIM BUFFER UTUH PERTAMA AGAR PROXY LUAR BISA MEMBACA TARGET DAN AKUNNYA
-        outboundWs.send(this.fullFirstChunkBackup);
-      });
-
-      outboundWs.on('message', (data) => {
-        if (webSocket.readyState === WebSocket.OPEN) {
-          webSocket.send(Buffer.from(data));
-        }
-      });
-
-      outboundWs.on('close', () => webSocket.close());
-      outboundWs.on('error', (err) => {
-        log(`Outbound WebSocket error: ${err.message}`);
-        webSocket.close();
-      });
-
-    } catch (error) {
-      log(`WebSocket Forwarder creation error: ${error.message}`);
-      webSocket.close();
-    }
+      remoteSocket.value = s;
+      s.on('close', () => webSocket.close());
+      s.on('error', () => webSocket.close());
+      this.remoteSocketToWS(s, webSocket, responseHeader, log);
+    } catch (e) { webSocket.close(); }
   }
 
   async handleUDPOutbound(targetAddress, targetPort, dataChunk, webSocket, responseHeader, log) {
@@ -377,15 +258,13 @@ class GatewayServer {
     return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+4, rawClientData: db.slice(pi+4), version: null, isUDP: udp };
   }
 
-  remoteSocketToWS(remoteSocket, webSocket, responseHeader, retry, log) {
-    let header = responseHeader, hasData = false;
+  remoteSocketToWS(remoteSocket, webSocket, responseHeader, log) {
+    let header = responseHeader;
     remoteSocket.on('data', (chunk) => {
-      hasData = true;
       if (webSocket.readyState !== WebSocket.OPEN) { remoteSocket.destroy(); return; }
       if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; }
       else webSocket.send(chunk);
     });
-    remoteSocket.on('close', () => { if (!hasData && retry) retry(); });
   }
 
   start(port = process.env.PORT || 3000) {
