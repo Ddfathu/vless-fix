@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
+// RAILWAY GATEWAY - UNIVERSAL DIRECT WITH GENERATOR
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -10,12 +10,6 @@ const dgram = require('dgram');
 const http = require('http');
 const https = require('https');
 const url = require('url');
-
-// Constants
-const horse = Buffer.from("dHJvamFu", 'base64').toString(); // "trojan"
-const flash = Buffer.from("dm1lc3M=", 'base64').toString(); // "vmess"
-const v2 = Buffer.from("djJyYXk=", 'base64').toString(); // "v2ray"
-const neko = Buffer.from("Y2xhc2g=", 'base64').toString(); // "clash"
 
 const CORS_HEADER_OPTIONS = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +25,7 @@ class GatewayServer {
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
   }
 
-  // ==================== HTTP HANDLERS & UI ====================
+  // ==================== HTTP HANDLERS & UI GENERATOR ====================
   handleHealthCheck(req, res) {
     const healthData = {
       status: 'healthy',
@@ -63,38 +57,348 @@ class GatewayServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RAILWAY GATEWAY // UNIVERSAL DASHBOARD</title>
+  <title>RAILWAY GATEWAY // DASHBOARD</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght=300;400;500;700&display=swap');
     body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
+    .cyber-glow { box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+    .cyber-glow-green { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
     .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
+    .neon-border:hover { border-color: rgba(59, 130, 246, 0.8); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f111a; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
   </style>
 </head>
-<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6">
-  <header class="border-b border-slate-900 pb-4 flex justify-between items-center max-w-7xl w-full mx-auto">
-    <div>
-      <h1 class="text-xl font-bold text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
-      <p class="text-xs text-slate-500 font-bold text-emerald-400">UNIVERSAL PATH MODE ACTIVE (ALL PATHS CONNECT TO DIRECT)</p>
+<body class="text-slate-300 min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+
+  <header class="border-b border-slate-900 bg-[#0d0e16]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-lg bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-400 cyber-glow animate-pulse">
+          <i class="fa-solid fa-terminal text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-wider text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
+          <p class="text-xs text-slate-500">CORE NODE ACTIVE & UNIVERSAL MODE</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 bg-[#121420] neon-border px-4 py-2 rounded-lg">
+          <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 cyber-glow-green animate-ping"></span>
+          <span class="text-xs font-semibold text-emerald-400 tracking-wider">UNIVERSAL PATHS POWERED</span>
+        </div>
+      </div>
     </div>
-    <div class="text-xs font-semibold text-emerald-400 bg-[#121420] px-4 py-2 rounded border border-blue-500/20">SYSTEM ONLINE</div>
   </header>
-  <main class="max-w-7xl w-full mx-auto my-8 space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
-        <h2 class="text-white font-bold">UNIVERSAL WEBSOCKET ENDPOINT</h2>
-        <p class="text-sm text-slate-300">Kamu bebas menggunakan path kata apa saja di aplikasi VPN, semuanya otomatis terhubung lurus (DIREK) menggunakan internet speed dewa dari server Railway!</p>
-        <p class="text-xs text-emerald-400 mt-2 font-bold">Contoh: ${protocolWs}://${currentHost}/BebasApaSaja</p>
+
+  <main class="max-w-7xl w-full mx-auto p-6 space-y-8 flex-grow">
+    
+    <!-- STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-500 font-medium mb-1">SYSTEM UPTIME</p>
+          <p id="uptime-val" class="text-lg font-bold text-white">${uptime}s</p>
+        </div>
+        <i class="fa-solid fa-clock text-slate-700 text-2xl"></i>
       </div>
-      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
-        <h2 class="text-white font-bold">MONITOR CORE</h2>
-        <p class="text-xs text-slate-400">Uptime: ${uptime}s | Allocation RAM: ${ramUsed} MB</p>
-        <p class="text-xs text-slate-400">Engine Node: ${nodeVersion}</p>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-500 font-medium mb-1">RAM ALLOCATION</p>
+          <p class="text-lg font-bold text-white">${ramUsed} MB</p>
+        </div>
+        <i class="fa-solid fa-microchip text-slate-700 text-2xl"></i>
+      </div>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-500 font-medium mb-1">DYNAMIC TUNNELING</p>
+          <p class="text-lg font-bold text-emerald-400">UNIVERSAL DIRECT</p>
+        </div>
+        <i class="fa-solid fa-bolt text-emerald-900/50 text-2xl"></i>
+      </div>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-500 font-medium mb-1">NODE VERSION</p>
+          <p class="text-lg font-bold text-blue-400">${nodeVersion}</p>
+        </div>
+        <i class="fa-brands fa-node-js text-blue-900/50 text-2xl"></i>
       </div>
     </div>
+
+    <!-- EXPLANATION INFO -->
+    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-2">
+      <div class="flex items-center gap-2 text-white font-bold">
+        <i class="fa-solid fa-circle-info text-blue-400"></i>
+        <span>INFO MODE UNIVERSAL DIRECT</span>
+      </div>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        Server ini berjalan dalam mode <span class="text-emerald-400 font-bold">Universal Direct</span>. Semua fitur proxy luar yang sering drop telah dihapus. Kamu bebas mengisi kolom path di aplikasi VPN dengan nama atau kata apa saja (termasuk config bawaan vmess/trojan/vless), semuanya otomatis diteruskan menggunakan IP Railway murni berkecepatan tinggi tanpa hambatan.
+      </p>
+    </div>
+
+    <!-- ==================== VLESS & TROJAN GENERATOR ==================== -->
+    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-5">
+      <div class="flex items-center gap-2 border-b border-slate-900 pb-3">
+        <i class="fa-solid fa-key text-yellow-400"></i>
+        <h2 class="text-md font-bold tracking-wide text-white">VLESS / TROJAN ACCOUNT GENERATOR</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        
+        <!-- INPUT SECTION -->
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">UUID / Password</label>
+            <div class="flex gap-2">
+              <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" 
+                     class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+              <button id="randomUuidBtn" class="bg-blue-600/20 border border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-lg text-xs transition flex items-center gap-1 whitespace-nowrap">
+                <i class="fa-solid fa-shuffle"></i> RANDOM
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Host / Domain</label>
+            <input id="hostInput" type="text" value="${currentHost}" 
+                   class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Port</label>
+            <input id="portInput" type="text" value="443" 
+                   class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Path (Bebas Ketik Apa Saja)</label>
+            <div class="flex gap-2">
+              <select id="pathSelect" 
+                      class="bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+                <option value="/DIREK">⚡ /DIREK (Standard)</option>
+                <option value="/ALL">🌍 /ALL (Universal)</option>
+                <option value="/G-SG">🇸🇬 /G-SG</option>
+                <option value="/ID">🇮🇩 /ID</option>
+                <option value="/VMESS">📡 /VMESS</option>
+                <option value="/CUSTOM">✏️ CUSTOM PATH</option>
+              </select>
+              <input id="pathInput" type="text" value="/DIREK" 
+                     class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+            </div>
+          </div>
+
+          <!-- SNI SECTION -->
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">
+              <i class="fa-solid fa-fingerprint text-purple-400 mr-1"></i> SNI (Server Name Indication)
+            </label>
+            <select id="sniSelect" 
+                    class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-purple-500 focus:outline-none transition mb-2">
+              <option value="business.whatsapp.com">📱 business.whatsapp.com</option>
+              <option value="media-sin6-3.cdn.whatsapp.net">📡 media-sin6-3.cdn.whatsapp.net</option>
+              <option value="c.whatsapp.com">💬 c.whatsapp.com</option>
+              <option value="web.whatsapp.com">🌐 web.whatsapp.com</option>
+              <option value="v.whatsapp.net">📞 v.whatsapp.net</option>
+              <option value="custom">✏️ CUSTOM SNI...</option>
+            </select>
+            <input id="sniInput" type="text" value="business.whatsapp.com" 
+                   class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-purple-500 focus:outline-none transition"
+                   placeholder="Ketik manual SNI custom di sini...">
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Nama / Remark</label>
+            <input id="remarkInput" type="text" value="RAILWAY UNIVERSAL ⚡" 
+                   class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
+          </div>
+
+          <button id="generateBtn" 
+                  class="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-black font-bold py-2.5 px-4 rounded-lg transition text-sm flex items-center justify-center gap-2 active:scale-95">
+            <i class="fa-solid fa-bolt"></i> GENERATE ACCOUNTS
+          </button>
+        </div>
+
+        <!-- OUTPUT SECTION -->
+        <div class="space-y-3">
+          <label class="text-xs text-slate-400 font-medium block">📋 Hasil Generate Config</label>
+          
+          <div class="space-y-2">
+            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-bold border border-purple-500/20">VLESS</span>
+                <button onclick="copyText(document.getElementById('vlessOutput').textContent)" 
+                        class="text-xs bg-[#171a29] border border-slate-800 text-slate-400 hover:text-purple-400 px-2 py-1 rounded transition flex items-center gap-1">
+                  <i class="fa-regular fa-copy"></i> COPY
+                </button>
+              </div>
+              <p id="vlessOutput" class="text-xs text-purple-300 font-mono break-all leading-relaxed bg-[#0a0b12] p-2 rounded border border-slate-900">
+                Loading...
+              </p>
+            </div>
+
+            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-500/20">TROJAN</span>
+                <button onclick="copyText(document.getElementById('trojanOutput').textContent)" 
+                        class="text-xs bg-[#171a29] border border-slate-800 text-slate-400 hover:text-orange-400 px-2 py-1 rounded transition flex items-center gap-1">
+                  <i class="fa-regular fa-copy"></i> COPY
+                </button>
+              </div>
+              <p id="trojanOutput" class="text-xs text-orange-300 font-mono break-all leading-relaxed bg-[#0a0b12] p-2 rounded border border-slate-900">
+                Loading...
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-[#10121d] border border-slate-800 rounded-lg p-3">
+            <p class="text-[10px] text-slate-500 mb-1">🔗 FORMAT IMPORT CLASH META / V2RAY</p>
+            <pre id="clashOutput" class="text-[11px] text-slate-400 font-mono break-all leading-relaxed whitespace-pre-wrap bg-[#0a0b12] p-2 rounded border border-slate-900 max-h-48 overflow-y-auto">Loading...</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
-  <footer class="text-center text-xs text-slate-600 border-t border-slate-900 pt-4">&copy; 2026 RAILWAY GATEWAY TERMINAL.</footer>
+
+  <footer class="border-t border-slate-950 bg-[#07080d] px-6 py-4 text-center text-xs text-slate-600">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>&copy; 2026 RAILWAY GATEWAY TERMINAL. ALL SYSTEM VECTORS STABLE.</p>
+    </div>
+  </footer>
+
+  <div id="toast" class="fixed bottom-6 right-6 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 transform translate-y-2 text-xs z-50 flex items-center gap-2">
+    <i class="fa-solid fa-circle-check"></i> ENDPOINT COPIED TO CLIPBOARD
+  </div>
+
+  <script>
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+          toast.classList.remove('opacity-100', 'translate-y-0');
+          toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+        }, 2500);
+      });
+    }
+
+    let uptimeStart = ${uptime};
+    setInterval(() => {
+      uptimeStart++;
+      document.getElementById('uptime-val').innerText = uptimeStart + 's';
+    }, 1000);
+
+    function generateUUID() {
+      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+      document.getElementById('uuidInput').value = uuid;
+      generateAccounts();
+    }
+
+    function generateTrojanPass() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let pass = '';
+      for (let i = 0; i < 36; i++) {
+        if (i === 8 || i === 13 || i === 18 || i === 23) { pass += '-'; }
+        else { pass += chars.charAt(Math.floor(Math.random() * chars.length)); }
+      }
+      return pass;
+    }
+
+    function generateAccounts() {
+      try {
+        const uuid = document.getElementById('uuidInput').value.trim() || '853b8456-0c0b-4bfa-b3b4-b2619248a9bc';
+        const host = document.getElementById('hostInput').value.trim() || '${currentHost}';
+        const port = document.getElementById('portInput').value.trim() || '443';
+        const path = document.getElementById('pathInput').value.trim() || '/DIREK';
+        const sni = document.getElementById('sniInput').value.trim() || 'business.whatsapp.com';
+        const remark = document.getElementById('remarkInput').value.trim() || 'RAILWAY UNIVERSAL';
+        const encodedPath = encodeURIComponent(path);
+        const encodedRemark = encodeURIComponent(remark);
+
+        // VLESS
+        const vlessUrl = 'vless://' + uuid + '@' + host + ':' + port +
+                         '?encryption=none&security=tls&sni=' + sni +
+                         '&fp=randomized&type=ws&host=' + host +
+                         '&path=' + encodedPath + '#' + encodedRemark;
+
+        // TROJAN
+        const trojanPass = generateTrojanPass();
+        const trojanUrl = 'trojan://' + trojanPass + '@' + host + ':' + port +
+                          '?security=tls&sni=' + sni +
+                          '&type=ws&host=' + host +
+                          '&path=' + encodedPath + '#' + encodedRemark;
+
+        document.getElementById('vlessOutput').textContent = vlessUrl;
+        document.getElementById('trojanOutput').textContent = trojanUrl;
+
+        // CLASH META
+        document.getElementById('clashOutput').textContent = 
+          '- name: "' + remark + ' VLESS"\\n' +
+          '  type: vless\\n' +
+          '  server: ' + host + '\\n' +
+          '  port: ' + port + '\\n' +
+          '  uuid: ' + uuid + '\\n' +
+          '  network: ws\\n' +
+          '  tls: true\\n' +
+          '  udp: true\\n' +
+          '  sni: "' + sni + '"\\n' +
+          '  client-fingerprint: randomized\\n' +
+          '  ws-opts:\\n' +
+          '    path: "' + path + '"\\n' +
+          '    headers:\\n' +
+          '      host: "' + host + '"\\n\\n' +
+          '- name: "' + remark + ' TROJAN"\\n' +
+          '  type: trojan\\n' +
+          '  server: ' + host + '\\n' +
+          '  port: ' + port + '\\n' +
+          '  password: ' + trojanPass + '\\n' +
+          '  network: ws\\n' +
+          '  tls: true\\n' +
+          '  udp: true\\n' +
+          '  sni: "' + sni + '"\\n' +
+          '  ws-opts:\\n' +
+          '    path: "' + path + '"\\n' +
+          '    headers:\\n' +
+          '      host: "' + host + '"';
+      } catch(err) { console.error('Generator Error:', err); }
+    }
+
+    // Init listeners
+    setTimeout(generateAccounts, 300);
+    setTimeout(() => {
+      ['uuidInput','hostInput','portInput','pathInput','sniInput','remarkInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', generateAccounts);
+      });
+      const pathSelect = document.getElementById('pathSelect');
+      if (pathSelect) pathSelect.addEventListener('change', function() {
+        if (this.value !== '/CUSTOM') {
+          document.getElementById('pathInput').value = this.value;
+          generateAccounts();
+        }
+      });
+      const sniSelect = document.getElementById('sniSelect');
+      if (sniSelect) sniSelect.addEventListener('change', function() {
+        const sniInput = document.getElementById('sniInput');
+        if (this.value === 'custom') { sniInput.value = ''; sniInput.focus(); }
+        else { sniInput.value = this.value; generateAccounts(); }
+      });
+      const genBtn = document.getElementById('generateBtn');
+      if (genBtn) genBtn.addEventListener('click', function(e) { e.preventDefault(); generateAccounts(); });
+      const randBtn = document.getElementById('randomUuidBtn');
+      if (randBtn) randBtn.addEventListener('click', function(e) { e.preventDefault(); generateUUID(); });
+    }, 600);
+  </script>
 </body>
 </html>`);
       return;
@@ -102,7 +406,7 @@ class GatewayServer {
     
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
     if (targetReversePrx) { await this.reverseWeb(req, res, targetReversePrx); } 
-    else { res.writeHead(404); res.end('Not Found'); }
+    else { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not Found'); }
   }
 
   async reverseWeb(request, response, target, targetPath) {
@@ -123,10 +427,10 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET HANDLERS ====================
+  // ==================== WEBSOCKET UNIVERSAL DIRECT HANDLERS ====================
   async handleWebSocketConnection(ws, request) {
-    // Kunci Utama Universal Path: Semua path langsung diizinkan masuk dan diproses
-    console.log(`WebSocket universal handshake connected via path: ${url.parse(request.url).pathname}`);
+    // Mode Universal: Menerima koneksi WebSocket dari path kata apa saja tanpa pengecekan ketat
+    console.log(`Universal WS accepted via path: ${url.parse(request.url).pathname}`);
     await this.websocketHandler(ws);
   }
 
@@ -176,12 +480,11 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== PURE DIRECT OUTBOUND GENERATION ====================
+  // ==================== 100% PURE DIRECT OUTBOUND ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
-    // 100% Langsung dilarikan lurus keluar menggunakan internet server Railway
     try {
       const s = net.createConnection({ host: addressRemote, port: portRemote }, () => {
-        log(`pure direct connection established to ${addressRemote}:${portRemote}`);
+        log(`universal direct tunnel opened to ${addressRemote}:${portRemote}`);
         s.write(rawClientData);
       });
       remoteSocket.value = s;
