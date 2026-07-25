@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - FULL COMPLETE (OPTION 3: WS FORWARDING)
+// RAILWAY GATEWAY - FULL COMPLETE (HYBRID SYSTEM FIX)
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -50,7 +50,6 @@ const CORS_HEADER_OPTIONS = {
 
 const REGION_MAP = {
   ASIA: ["ID", "SG", "MY", "PH", "TH", "VN", "JP", "KR", "CN", "HK", "TW"],
-  SOUTHASIA: ["IN", "BD", "PK", "LK", "NP", "AF", "BT", "MV"],
   GLOBAL: []
 };
 
@@ -63,82 +62,39 @@ class GatewayServer {
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
     this.isDirectRoute = false;
-    this.currentWsIncomingReq = null; // Menyimpan info request WS asal
+    this.fullFirstChunkBackup = null; // Penampung paket data utuh awal
+    this.currentWsIncomingReq = null;
   }
 
   // ==================== HTTP HANDLERS & UI ====================
   handleHealthCheck(req, res) {
-    const healthData = { status: 'healthy', uptime: process.uptime() };
     res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
-    res.end(JSON.stringify(healthData, null, 2));
-  }
-
-  handleCorsPreflight(req, res) { res.writeHead(200, this.CORS_HEADER_OPTIONS); res.end(); }
-
-  async handleApiRequest(req, res, parsedUrl) {
-    try {
-      if (parsedUrl.pathname === '/api/proxies') {
-        const proxies = await this.getPrxList(process.env.PRX_BANK_URL);
-        const format = parsedUrl.query.format || 'json';
-        if (format === 'text') {
-          const proxyText = proxies.map(p => `${p.country} - ${p.prxIP}:${p.prxPort}`).join('\n');
-          res.writeHead(200, { 'Content-Type': 'text/plain', ...this.CORS_HEADER_OPTIONS });
-          res.end(proxyText); return;
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
-        res.end(JSON.stringify(proxies, null, 2)); return;
-      }
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    res.end(JSON.stringify({ status: 'healthy', uptime: process.uptime() }));
   }
 
   async handleHttpRequest(req, res) {
     const parsedUrl = url.parse(req.url, true);
-    if (req.method === 'OPTIONS') { this.handleCorsPreflight(req, res); return; }
+    if (req.method === 'OPTIONS') { res.writeHead(200, this.CORS_HEADER_OPTIONS); res.end(); return; }
     if (parsedUrl.pathname === '/health') { this.handleHealthCheck(req, res); return; }
-    if (parsedUrl.pathname.startsWith('/api/')) { await this.handleApiRequest(req, res, parsedUrl); return; }
     
     if (parsedUrl.pathname === '/') {
       const currentHost = req.headers.host || 'localhost:3000';
       const protocolWs = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws';
-      const uptime = Math.floor(process.uptime());
-      const ramUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-      
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>RAILWAY GATEWAY // DASHBOARD</title>
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>
-    body { font-family: monospace; background-color: #0a0b10; color: #cbd5e1; }
-    .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
-  </style>
-</head>
-<body class="p-6">
-  <div class="max-w-7xl mx-auto space-y-6">
-    <h2 class="text-xl font-bold text-white">RAILWAY GATEWAY // WEBSOCKET FORWARDER ACTIVE</h2>
-    <div class="bg-[#0d0e16] neon-border p-6 rounded-xl">
-      <p>Mode DIREK: <span class="text-red-400">${protocolWs}://${currentHost}/DIREK</span></p>
-      <p>Mode PROXY WORKER: <span class="text-purple-400">${protocolWs}://${currentHost}/G-SG</span></p>
-      <p>RAM Allocation: ${ramUsed} MB | Uptime: ${uptime}s</p>
-    </div>
-  </div>
-</body>
-</html>`);
+      res.end(`<html><body style="background:#0a0b10;color:#fff;font-family:monospace;padding:20px;">
+        <h2>RAILWAY GATEWAY // HYBRID REPAIRED</h2>
+        <p>Direct Path: ${protocolWs}://${currentHost}/DIREK</p>
+        <p>Proxy Path: ${protocolWs}://${currentHost}/G-SG atau ${protocolWs}://${currentHost}/ALL</p>
+      </body></html>`);
       return;
     }
-    
+
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx) { await this.reverseWeb(req, res, targetReversePrx); } 
+    if (targetReversePrx) { this.reverseWeb(req, res, targetReversePrx); } 
     else { res.writeHead(404); res.end('Not Found'); }
   }
 
   async getKVPrxList(kvPrxUrl = KV_PRX_URL) {
-    if (!kvPrxUrl) throw new Error("No URL Provided!");
     try {
       const kvPrx = await fetch(kvPrxUrl);
       if (kvPrx.status == 200) return await kvPrx.json();
@@ -153,31 +109,28 @@ class GatewayServer {
       if (response.status === 200) {
         const data = await response.json();
         if (!Array.isArray(data)) return [];
-        return data.map(proxy => {
-          const ip = proxy.prxIP || proxy.ip || proxy.server;
-          const port = proxy.prxPort || proxy.port;
-          const country = proxy.country || proxy.cc || 'XX';
-          if (!ip || !port) return null;
-          return { prxIP: ip, prxPort: port, country: country.toUpperCase() };
-        }).filter(Boolean);
+        return data.map(proxy => ({
+          prxIP: proxy.prxIP || proxy.ip || proxy.server,
+          prxPort: proxy.prxPort || proxy.port,
+          country: (proxy.country || proxy.cc || 'XX').toUpperCase()
+        })).filter(p => p.prxIP && p.prxPort);
       }
       return [];
     } catch (error) { return []; }
   }
 
-  async reverseWeb(request, response, target, targetPath) {
+  async reverseWeb(request, response, target) {
     try {
       const targetUrl = new URL(request.url);
       const targetChunk = target.split(":");
       targetUrl.hostname = targetChunk[0];
-      targetUrl.port = targetChunk[1]?.toString() || "443";
-      targetUrl.pathname = targetPath || targetUrl.pathname;
+      targetUrl.port = targetChunk[1] || "443";
       const options = {
         hostname: targetUrl.hostname, port: targetUrl.port,
         path: targetUrl.pathname + targetUrl.search, method: request.method,
         headers: { ...request.headers, host: targetUrl.hostname }
       };
-      const proxyReq = (targetUrl.protocol === 'https:' ? https : http).request(options, (proxyRes) => {
+      const proxyReq = https.request(options, (proxyRes) => {
         response.writeHead(proxyRes.statusCode, proxyRes.headers); proxyRes.pipe(response);
       });
       request.pipe(proxyReq);
@@ -185,15 +138,14 @@ class GatewayServer {
   }
 
   // ==================== WEBSOCKET HANDLERS ====================
-
   async handleWebSocketConnection(ws, request) {
     try {
       const parsedUrl = url.parse(request.url, true);
       const path = parsedUrl.pathname;
       console.log(`WebSocket request path: ${path}`);
-
+      
       this.isDirectRoute = false;
-      this.currentWsIncomingReq = request; // Simpan info request incoming
+      this.currentWsIncomingReq = request;
 
       if (path.toUpperCase() === '/DIREK') {
         this.isDirectRoute = true;
@@ -207,6 +159,7 @@ class GatewayServer {
         if (CUSTOM_PROXY[customKey] && CUSTOM_PROXY[customKey].length > 0) {
           const list = CUSTOM_PROXY[customKey];
           this.prxIP = list[Math.floor(Math.random() * list.length)];
+          console.log(`Hardcode Match: ${this.prxIP}`);
           await this.websocketHandler(ws); return;
         }
       }
@@ -227,6 +180,7 @@ class GatewayServer {
         this.prxIP = filtered.length > 0 ? `${filtered[0].prxIP}:${filtered[0].prxPort}` : `${proxies[0].prxIP}:${proxies[0].prxPort}`;
       }
 
+      console.log(`Selected Target Proxy: ${this.prxIP}`);
       await this.websocketHandler(ws);
     } catch (err) { ws.close(1011); }
   }
@@ -240,17 +194,17 @@ class GatewayServer {
       try {
         const chunk = Buffer.from(message);
         
-        // JIKA CLIENT SUDAH TERHUBUNG KE OUTBOUND: Teruskan data langsung
         if (remoteSocketWrapper.value) {
           if (remoteSocketWrapper.value instanceof WebSocket) {
-            if (remoteSocketWrapper.value.readyState === WebSocket.OPEN) {
-              remoteSocketWrapper.value.send(chunk);
-            }
+            if (remoteSocketWrapper.value.readyState === WebSocket.OPEN) remoteSocketWrapper.value.send(chunk);
           } else {
             remoteSocketWrapper.value.write(chunk);
           }
           return;
         }
+
+        // BACKUP PAKET UTUH AWAL DARI DARK TUNNEL (Kunci Lolos Handshake Luar)
+        this.fullFirstChunkBackup = chunk;
 
         const protocol = await this.protocolSniffer(chunk);
         let protocolHeader;
@@ -294,17 +248,17 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== ENGINE BARU LUAR BIASA (SISTEM OPERSAN WEBSOCKET HTTP) ====================
+  // ==================== CORE TCP FORWARDING FIX FOR PROXY WORKER ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
+    const connectAndWrite = (address, port, dataToSend) => new Promise((resolve, reject) => {
+      const s = net.createConnection({ host: address, port }, () => { log(`TCP dial-out to ${address}:${port}`); s.write(dataToSend); resolve(s); });
+      s.on('error', reject);
+    });
     
-    // JIKA PATH /DIREK AKTIF: Pakai modul TCP mentah bawaan asli temen lu
+    // JIKA /DIREK: Jalankan TCP Outbound polosan bawaan asli temanmu langsung ke internet
     if (this.isDirectRoute || !this.prxIP) {
-      const connectAndWrite = (address, port) => new Promise((resolve, reject) => {
-        const s = net.createConnection({ host: address, port }, () => { log(`connected to ${address}:${port}`); s.write(rawClientData); resolve(s); });
-        s.on('error', reject);
-      });
       try {
-        const s = await connectAndWrite(addressRemote, portRemote);
+        const s = await connectAndWrite(addressRemote, portRemote, rawClientData);
         remoteSocket.value = s;
         s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
         this.remoteSocketToWS(s, webSocket, responseHeader, null, log);
@@ -312,15 +266,14 @@ class GatewayServer {
       return;
     }
 
-    // JIKA MODE PROXY AKTIF: Ubah Railway menjadi Klien WebSocket untuk nembak HTTP Worker luar!
+    // JIKA LEWAT PATH PROXY: Bikin WebSocket baru ke Worker luar, lalu kirim paket UTUH (fullFirstChunkBackup)
     try {
       const [proxyHost, proxyPort] = this.prxIP.split(/[:=-]/);
       const isPortTls = proxyPort == "443" || proxyPort == "8443" || proxyPort == "2053";
       const targetWsUrl = `${isPortTls ? 'wss' : 'ws'}://${proxyHost}:${proxyPort}${this.currentWsIncomingReq.url}`;
       
-      log(`Option 3 Active: Dialing WebSocket Client to Worker -> ${targetWsUrl}`);
+      log(`Proxy Mode Engaged -> Connecting client WS to Target: ${targetWsUrl}`);
 
-      // Ambil seluruh header jabat tangan WebSocket asli dari DarkTunnel agar lolos Cloudflare
       const forwardHeaders = { ...this.currentWsIncomingReq.headers };
       delete forwardHeaders.host;
       delete forwardHeaders.connection;
@@ -334,26 +287,25 @@ class GatewayServer {
       remoteSocket.value = outboundWs;
 
       outboundWs.on('open', () => {
-        log(`WebSocket Handshake to target Worker SUCCESS!`);
-        // Kirim raw payload pertama dari DarkTunnel setelah jabat tangan di seberang sukses
-        outboundWs.send(rawClientData);
+        log(`WS Outbound to Proxy Worker established! Sending full VLESS header payload...`);
+        // KIRIM BUFFER UTUH PERTAMA AGAR PROXY LUAR BISA MEMBACA TARGET DAN AKUNNYA
+        outboundWs.send(this.fullFirstChunkBackup);
       });
 
       outboundWs.on('message', (data) => {
         if (webSocket.readyState === WebSocket.OPEN) {
-          // Oper balik semua data web/streaming dari Worker luar ke aplikasi DarkTunnel
           webSocket.send(Buffer.from(data));
         }
       });
 
       outboundWs.on('close', () => webSocket.close());
       outboundWs.on('error', (err) => {
-        log(`Outbound Worker WebSocket Error: ${err.message}`);
+        log(`Outbound WebSocket error: ${err.message}`);
         webSocket.close();
       });
 
     } catch (error) {
-      log(`Option 3 Failed to create client: ${error.message}`);
+      log(`WebSocket Forwarder creation error: ${error.message}`);
       webSocket.close();
     }
   }
