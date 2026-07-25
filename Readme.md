@@ -10,6 +10,7 @@ Proxy server yang mendukung WebSocket dengan protokol Trojan, VMess, dan Shadows
 - ✅ Reverse proxy HTTP
 - ✅ koneksi agro tunnel
 - ✅ vles direk
+- 👍ui trrpisah denga server js bisa ubah ui lbih mudah tanpa takut logika vles rusak 💔
 
 ## Instalasi
 cara instalasi
