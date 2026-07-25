@@ -1,10 +1,22 @@
 // ============================================
 // DDFATHUVLES GATEWAY - BLUE CYBERPUNK UI TEMPLATE
-// FIXED BUG HOST COLUMN + ACCURATE UNIQUE IP COUNTER
+// REAL-TIME IP MONITORING LIST ADDED
 // Terpisah agar Aman dan Mudah Diedit Modifikasi
 // ============================================
 
-function generateUI(currentHost, uptime, onlineClients, totalVisits) {
+function generateUI(currentHost, uptime, onlineClients, totalVisits, ipList = [], visitorIP = '') {
+  // Generate HTML untuk daftar IP aktif
+  let ipListHTML = '';
+  if (ipList.length === 0) {
+    // Jika tidak ada koneksi VPN tapi lu lagi buka web, tampilin IP lu sendiri
+    ipListHTML = `<div class="text-[11px] text-blue-400/70 py-1 font-mono">● ${visitorIP || '127.0.0.1'} <span class="text-emerald-400 font-bold">(You)</span></div>`;
+  } else {
+    ipList.forEach(ip => {
+      const isMe = (ip === visitorIP) ? '<span class="text-emerald-400 font-bold">(You)</span>' : '';
+      ipListHTML += `<div class="text-[11px] text-blue-300 py-0.5 font-mono tracking-wider border-b border-blue-950/30 last:border-none">● ${ip} ${isMe}</div>`;
+    });
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,6 +52,14 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
         <div class="flex justify-center items-center gap-1.5">
           <p class="text-[10px] text-blue-400 font-bold tracking-widest">📋 TOTAL HISTORY HITS: <span class="text-yellow-400 font-mono">${totalVisits}x</span> DIKUNJUNGI</p>
         </div>
+      </div>
+    </div>
+
+    <!-- LIVE CONNECTED IP LIST BOX -->
+    <div class="card-blue p-3 rounded-xl">
+      <p class="text-[9px] text-blue-400 font-bold tracking-wider mb-1.5 uppercase">🌐 Active Connected IP Addresses</p>
+      <div class="bg-[#040610] rounded-lg p-2 max-h-24 overflow-y-auto border border-blue-950 space-y-0.5">
+        ${ipListHTML}
       </div>
     </div>
 
