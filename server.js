@@ -1,6 +1,6 @@
 // ============================================
 // RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
-// UI Cyberpunk DDFATHUVLES + WebSocket Sniffer Multi-Protocol MURNI
+// UI Blue Cyberpunk + Live Online Counter + Total Visit History MURNI
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -29,9 +29,10 @@ class GatewayServer {
     this.httpServer = null;
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
+    this.totalVisits = 0; // Menyimpan riwayat total kunjungan ke server
   }
 
-  // ==================== HTTP HANDLERS & UI GENERATOR MURNI ====================
+  // ==================== HTTP HANDLERS & UI GENERATOR ====================
   handleHealthCheck(req, res) {
     const healthData = {
       status: 'healthy',
@@ -51,8 +52,11 @@ class GatewayServer {
     if (parsedUrl.pathname === '/health') { this.handleHealthCheck(req, res); return; }
     
     if (parsedUrl.pathname === '/') {
+      this.totalVisits++; // Tambah 1 riwayat setiap kali halaman diakses/dikunjungi
+      
       const currentHost = req.headers.host || 'localhost:3000';
       const uptime = Math.floor(process.uptime());
+      const onlineClients = this.wss ? this.wss.clients.size : 0;
       
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(`<!DOCTYPE html>
@@ -60,118 +64,126 @@ class GatewayServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ddfathuvles // SYSTEM MONITOR</title>
+  <title>ddfathuvles // BLUE SYSTEM MONITOR</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; background-color: #050508; }
-    .card-dark { background-color: #0b0c13; border: 1px solid #161925; }
-    .btn-dark { background-color: #121420; border: 1px solid #1e2235; color: #a0aec0; }
-    .btn-dark:hover { border-color: #3b82f6; color: #fff; }
-    .btn-active { border-color: #eab308 !important; color: #eab308 !important; }
+    body { font-family: 'JetBrains Mono', monospace; background-color: #060919; }
+    .card-blue { background-color: #0c132b; border: 1px solid #1e295b; }
+    .btn-blue { background-color: #131d42; border: 1px solid #283c79; color: #93c5fd; }
+    .btn-blue:hover { border-color: #3b82f6; color: #fff; background-color: #1a2756; }
+    .btn-active { border-color: #60a5fa !important; color: #fff !important; background-color: #1d4ed8 !important; }
   </style>
 </head>
-<body class="text-slate-400 min-h-screen flex flex-col justify-between p-4 max-w-md mx-auto selection:bg-blue-600 selection:text-white">
+<body class="text-blue-200 min-h-screen flex flex-col justify-between p-4 max-w-md mx-auto selection:bg-blue-600 selection:text-white">
 
   <!-- LIVE TIMER UPPERHEAD -->
   <div class="text-center my-2">
-    <div id="live-timer" class="text-4xl font-bold text-white tracking-widest">00:00:00</div>
+    <div id="live-timer" class="text-4xl font-bold text-white tracking-widest drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">00:00:00</div>
   </div>
 
   <main class="space-y-4 flex-grow mt-2">
-    <!-- BRAND HEADER -->
-    <div class="text-center card-dark p-3 rounded-xl border-dashed">
-      <h1 class="text-lg font-bold text-white tracking-wider">⚡ DDFATHUVLES<span class="text-blue-500">.sys</span></h1>
-      <p class="text-[10px] text-emerald-400 font-bold tracking-widest mt-0.5">TUNNEL MONITOR & ACCOUNT GENERATOR</p>
+    <!-- BRAND HEADER & COUNTERS -->
+    <div class="text-center card-blue p-3 rounded-xl border-dashed">
+      <h1 class="text-lg font-bold text-white tracking-wider">⚡ DDFATHUVLES<span class="text-blue-400">.sys</span></h1>
+      <div class="flex flex-col gap-1 mt-1.5 border-t border-blue-950/50 pt-1.5">
+        <div class="flex justify-center items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <p class="text-[11px] text-emerald-300 font-bold tracking-widest">ONLINE CLIENTs: <span id="online-count" class="text-white">${onlineClients}</span> ORG</p>
+        </div>
+        <div class="flex justify-center items-center gap-1.5">
+          <p class="text-[10px] text-blue-400 font-bold tracking-widest">📋 TOTAL HISTORY HITS: <span class="text-yellow-400 font-mono">${this.totalVisits}x</span> DIKUNJUNGI</p>
+        </div>
+      </div>
     </div>
 
-    <!-- METRICS GRID -->
+    <!-- METRICS GRID (CPU & RAM) -->
     <div class="grid grid-cols-2 gap-3">
-      <div class="card-dark p-4 rounded-xl relative overflow-hidden">
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">CPU</p>
-        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">9.1%</p>
-        <div class="absolute bottom-0 left-0 h-1 bg-cyan-400 w-1/3"></div>
+      <div class="card-blue p-4 rounded-xl relative overflow-hidden">
+        <p class="text-[10px] text-blue-400 font-bold tracking-wider">CPU USAGE</p>
+        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">8.4%</p>
+        <div class="absolute bottom-0 left-0 h-1 bg-blue-500 w-1/3"></div>
       </div>
-      <div class="card-dark p-4 rounded-xl relative overflow-hidden">
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">RAM</p>
-        <p id="ram-val" class="text-2xl font-bold text-white mt-1">29.8%</p>
-        <div class="absolute bottom-0 left-0 h-1 bg-purple-500 w-1/2"></div>
+      <div class="card-blue p-4 rounded-xl relative overflow-hidden">
+        <p class="text-[10px] text-blue-400 font-bold tracking-wider">RAM ALLOC</p>
+        <p id="ram-val" class="text-2xl font-bold text-white mt-1">24.2%</p>
+        <div class="absolute bottom-0 left-0 h-1 bg-indigo-500 w-1/2"></div>
       </div>
     </div>
 
     <!-- TRAFFIC METRICS -->
     <div class="grid grid-cols-2 gap-3">
-      <div class="card-dark p-4 rounded-xl">
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">DOWNLOAD</p>
-        <p id="dl-total" class="text-xl font-bold text-white mt-1">189.31 MB</p>
-        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">356.3 KB/s</p>
+      <div class="card-blue p-4 rounded-xl">
+        <p class="text-[10px] text-blue-400 font-bold tracking-wider">DOWNLOAD</p>
+        <p id="dl-total" class="text-xl font-bold text-white mt-1">128.4 MB</p>
+        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">245.1 KB/s</p>
       </div>
-      <div class="card-dark p-4 rounded-xl">
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">UPLOAD</p>
-        <p id="ul-total" class="text-xl font-bold text-white mt-1">142.6 MB</p>
-        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">357.74 KB/s</p>
+      <div class="card-blue p-4 rounded-xl">
+        <p class="text-[10px] text-blue-400 font-bold tracking-wider">UPLOAD</p>
+        <p id="ul-total" class="text-xl font-bold text-white mt-1">96.2 MB</p>
+        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">182.4 KB/s</p>
       </div>
     </div>
 
     <!-- ANIMATED PULSE GRAPH -->
-    <div class="card-dark p-4 rounded-xl">
+    <div class="card-blue p-4 rounded-xl">
       <div class="flex justify-between items-center mb-2">
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">NETWORK TRAFFIC STATUS (60S)</p>
+        <p class="text-[10px] text-blue-400 font-bold tracking-wider">NETWORK TRAFFIC STATUS (60S)</p>
         <div class="flex gap-3 text-[10px] font-bold">
           <span class="text-emerald-400">● RX</span>
           <span class="text-blue-400">● TX</span>
         </div>
       </div>
-      <div class="w-full bg-black/40 rounded h-12 flex items-end p-1 gap-0.5 overflow-hidden">
+      <div class="w-full bg-[#040610] rounded h-12 flex items-end p-1 gap-0.5 overflow-hidden border border-blue-950">
         <div id="bar-container" class="w-full flex items-end justify-between h-full"></div>
       </div>
     </div>
 
     <!-- CONFIG CONTROL BOX -->
-    <div class="card-dark p-4 rounded-xl space-y-4">
+    <div class="card-blue p-4 rounded-xl space-y-4">
       <div class="grid grid-cols-2 gap-2 text-xs">
         <div>
-          <label class="text-[10px] text-slate-500 font-bold block mb-1">UUID/PASS</label>
-          <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
+          <label class="text-[10px] text-blue-400 font-bold block mb-1">UUID/PASS</label>
+          <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" class="w-full bg-[#060917] border border-blue-900 rounded p-1.5 text-white font-mono focus:outline-none focus:border-blue-500">
         </div>
         <div>
-          <label class="text-[10px] text-slate-500 font-bold block mb-1">HOST DOMAIN</label>
-          <input id="hostInput" type="text" value="${currentHost}" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
+          <label class="text-[10px] text-blue-400 font-bold block mb-1">HOST DOMAIN</label>
+          <input id="hostInput" type="text" value="${currentHost}" class="w-full bg-[#060917] border border-blue-900 rounded p-1.5 text-white font-mono focus:outline-none focus:border-blue-500">
         </div>
       </div>
 
       <div class="space-y-2">
-        <div class="border-l-2 border-slate-700 pl-2">
-          <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG SNI</p>
+        <div class="border-l-2 border-blue-500 pl-2">
+          <p class="text-[11px] font-bold text-blue-200 tracking-wider">BUG SNI</p>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <button onclick="buildConfig('vless', 'sni')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
-          <button onclick="buildConfig('trojan', 'sni')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
+          <button onclick="buildConfig('vless', 'sni')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
+          <button onclick="buildConfig('trojan', 'sni')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
         </div>
       </div>
 
       <div class="space-y-2">
-        <div class="border-l-2 border-slate-700 pl-2">
-          <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG CDN</p>
+        <div class="border-l-2 border-blue-500 pl-2">
+          <p class="text-[11px] font-bold text-blue-200 tracking-wider">BUG CDN</p>
         </div>
         <div class="grid grid-cols-3 gap-2">
-          <button onclick="buildConfig('vless', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
-          <button onclick="buildConfig('vmess', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VMESS</button>
-          <button onclick="buildConfig('trojan', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
+          <button onclick="buildConfig('vless', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
+          <button onclick="buildConfig('vmess', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VMESS</button>
+          <button onclick="buildConfig('trojan', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
         </div>
       </div>
 
-      <div id="output-area" class="hidden space-y-1.5 bg-[#06070a] p-3 rounded-lg border border-slate-900">
+      <div id="output-area" class="hidden space-y-1.5 bg-[#040610] p-3 rounded-lg border border-blue-950">
         <div class="flex justify-between items-center">
-          <span id="out-type" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black">VLESS</span>
+          <span id="out-type" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-white">VLESS</span>
           <button onclick="copyOutConfig()" class="text-[10px] text-blue-400 font-bold hover:underline">COPY</button>
         </div>
-        <p id="configText" class="text-[11px] font-mono text-slate-300 break-all bg-black/40 p-2 rounded border border-slate-950 max-h-24 overflow-y-auto">Loading...</p>
+        <p id="configText" class="text-[11px] font-mono text-blue-100 break-all bg-black/40 p-2 rounded border border-blue-950 max-h-24 overflow-y-auto">Loading...</p>
       </div>
     </div>
   </main>
 
-  <footer class="text-center text-[10px] text-slate-700 mt-4">&copy; 2026 DDFATHUVLES TERMINAL.</footer>
+  <footer class="text-center text-[10px] text-blue-500 mt-4">&copy; 2026 DDFATHUVLES BLUE TERMINAL.</footer>
 
   <script>
     let currentUptime = ${uptime};
@@ -187,10 +199,10 @@ class GatewayServer {
     }, 1000);
 
     setInterval(() => {
-      document.getElementById('cpu-val').innerText = (Math.random() * 8 + 4).toFixed(1) + '%';
-      document.getElementById('ram-val').innerText = (Math.random() * 3 + 28).toFixed(1) + '%';
-      let dlSpd = Math.random() * 300 + 100;
-      let ulSpd = Math.random() * 250 + 90;
+      document.getElementById('cpu-val').innerText = (Math.random() * 6 + 4).toFixed(1) + '%';
+      document.getElementById('ram-val').innerText = (Math.random() * 2 + 23).toFixed(1) + '%';
+      let dlSpd = Math.random() * 250 + 80;
+      let ulSpd = Math.random() * 200 + 70;
       document.getElementById('dl-speed').innerText = dlSpd.toFixed(1) + ' KB/s';
       document.getElementById('ul-speed').innerText = ulSpd.toFixed(2) + ' KB/s';
     }, 2000);
@@ -199,7 +211,7 @@ class GatewayServer {
     const totalBars = 35;
     for(let i=0; i<totalBars; i++) {
       let b = document.createElement('div');
-      b.className = 'w-2 bg-cyan-500/20 rounded-t transition-all duration-300';
+      b.className = 'w-2 bg-blue-500/20 rounded-t transition-all duration-300';
       b.style.height = (Math.random() * 80 + 10) + '%';
       container.appendChild(b);
     }
@@ -207,9 +219,9 @@ class GatewayServer {
       Array.from(container.children).forEach(b => {
         b.style.height = (Math.random() > 0.85 ? Math.random() * 90 + 10 : Math.random() * 20 + 5) + '%';
         if(parseFloat(b.style.height) > 60) {
-          b.className = 'w-2 bg-cyan-400 rounded-t transition-all duration-300';
+          b.className = 'w-2 bg-blue-400 rounded-t transition-all duration-300';
         } else {
-          b.className = 'w-2 bg-cyan-600/30 rounded-t transition-all duration-300';
+          b.className = 'w-2 bg-blue-700/30 rounded-t transition-all duration-300';
         }
       });
     }, 1000);
@@ -276,7 +288,7 @@ class GatewayServer {
 
   // ==================== WEBSOCKET HANDLERS (MURNI LOGIKA SAKTI LU) ====================
   async handleWebSocketConnection(ws, request) {
-    console.log(`WebSocket universal handshake connected via path: ${url.parse(request.url).pathname}`);
+    console.log(`[ONLINE] Klien terhubung! Total aktif: ${this.wss.clients.size}`);
     await this.websocketHandler(ws);
   }
 
@@ -312,8 +324,14 @@ class GatewayServer {
       }
     });
 
-    ws.on('close', () => { if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); this.cleanupUDPConnections(ws); });
-    ws.on('error', () => this.cleanupUDPConnections(ws));
+    ws.on('close', () => { 
+      if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); 
+      this.cleanupUDPConnections(ws);
+      console.log(`[DISCONNECT] Klien terputus. Sisa aktif: ${this.wss ? this.wss.clients.size : 0}`);
+    });
+    ws.on('error', () => {
+      this.cleanupUDPConnections(ws);
+    });
   }
 
   async protocolSniffer(buffer) {
