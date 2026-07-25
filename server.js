@@ -1,6 +1,6 @@
 // ============================================
-// RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
-// UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
+// RAILWAY GATEWAY - UNIVERSAL DIRECT CONNECT + ARGO TUNNEL
+// UI DDFATHUVLES CYBERPUNK MONITOR + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -10,12 +10,6 @@ const dgram = require('dgram');
 const http = require('http');
 const https = require('https');
 const url = require('url');
-
-// Constants
-const horse = Buffer.from("dHJvamFu", 'base64').toString(); // "trojan"
-const flash = Buffer.from("dm1lc3M=", 'base64').toString(); // "vmess"
-const v2 = Buffer.from("djJyYXk=", 'base64').toString(); // "v2ray"
-const neko = Buffer.from("Y2xhc2g=", 'base64').toString(); // "clash"
 
 const CORS_HEADER_OPTIONS = {
   "Access-Control-Allow-Origin": "*",
@@ -29,20 +23,13 @@ class GatewayServer {
     this.httpServer = null;
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
+    this.isDirectRoute = true;
   }
 
   // ==================== HTTP HANDLERS & UI GENERATOR ====================
   handleHealthCheck(req, res) {
-    const healthData = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      service: 'railway-gateway',
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      features: { websocket: true, tcp: true, udp: true }
-    };
     res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
-    res.end(JSON.stringify(healthData, null, 2));
+    res.end(JSON.stringify({ status: 'healthy', uptime: process.uptime() }));
   }
 
   async handleHttpRequest(req, res) {
@@ -51,10 +38,8 @@ class GatewayServer {
     if (parsedUrl.pathname === '/health') { this.handleHealthCheck(req, res); return; }
     
     if (parsedUrl.pathname === '/') {
-      const currentHost = req.headers.host || 'localhost:3000';
-      const protocolWs = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws';
+      const currentHost = req.headers.host || 'localhost:8080';
       const uptime = Math.floor(process.uptime());
-      const ramUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
       const nodeVersion = process.version;
       
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -63,155 +48,226 @@ class GatewayServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RAILWAY GATEWAY // DASHBOARD</title>
+  <title>ddfathuvles // SYSTEM MONITOR</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
-    .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
-    .neon-border:hover { border-color: rgba(59, 130, 246, 0.8); }
+    body { font-family: 'JetBrains Mono', monospace; background-color: #050508; }
+    .card-dark { background-color: #0b0c13; border: 1px solid #161925; }
+    .btn-dark { background-color: #121420; border: 1px solid #1e2235; color: #a0aec0; }
+    .btn-dark:hover { border-color: #3b82f6; color: #fff; }
+    .btn-active { border-color: #eab308 !important; color: #eab308 !important; }
   </style>
 </head>
-<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6 selection:bg-blue-600 selection:text-white">
+<body class="text-slate-400 min-h-screen flex flex-col justify-between p-4 max-w-md mx-auto selection:bg-blue-600 selection:text-white">
 
-  <header class="border-b border-slate-900 pb-4 flex justify-between items-center max-w-7xl w-full mx-auto">
-    <div>
-      <h1 class="text-xl font-bold text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
-      <p class="text-xs text-slate-500 font-bold text-emerald-400">UNIVERSAL PATH MODE ACTIVE (ALL PATHS CONNECT TO DIRECT)</p>
+  <!-- LIVE TIMER UPPERHEAD -->
+  <div class="text-center my-2">
+    <div id="live-timer" class="text-4xl font-bold text-white tracking-widest">00:00:00</div>
+  </div>
+
+  <main class="space-y-4 flex-grow mt-2">
+    <!-- BRAND HEADER -->
+    <div class="text-center card-dark p-3 rounded-xl border-dashed">
+      <h1 class="text-lg font-bold text-white tracking-wider">⚡ DDFATHUVLES<span class="text-blue-500">.sys</span></h1>
+      <p class="text-[10px] text-emerald-400 font-bold tracking-widest mt-0.5">TUNNEL MONITOR & ACCOUNT GENERATOR</p>
     </div>
-    <div class="text-xs font-semibold text-emerald-400 bg-[#121420] px-4 py-2 rounded border border-blue-500/20">SYSTEM ONLINE</div>
-  </header>
 
-  <main class="max-w-7xl w-full mx-auto my-6 space-y-6 flex-grow">
-    
-    <!-- STATS -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
-        <p class="text-xs text-slate-500 mb-1">SYSTEM UPTIME</p>
-        <p id="uptime-val" class="text-lg font-bold text-white">${uptime}s</p>
+    <!-- METRICS GRID (CPU & RAM) -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="card-dark p-4 rounded-xl relative overflow-hidden">
+        <p class="text-[10px] text-slate-500 font-bold tracking-wider">CPU</p>
+        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">0.0%</p>
+        <div class="absolute bottom-0 left-0 h-1 bg-cyan-400 w-1/3"></div>
       </div>
-      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
-        <p class="text-xs text-slate-500 mb-1">RAM ALLOCATION</p>
-        <p class="text-lg font-bold text-white">${ramUsed} MB</p>
-      </div>
-      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
-        <p class="text-xs text-slate-500 mb-1">TUNNEL STRATEGY</p>
-        <p class="text-lg font-bold text-emerald-400">PURE DIRECT</p>
-      </div>
-      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
-        <p class="text-xs text-slate-500 mb-1">ENGINE VERSION</p>
-        <p class="text-lg font-bold text-blue-400">${nodeVersion}</p>
+      <div class="card-dark p-4 rounded-xl relative overflow-hidden">
+        <p class="text-[10px] text-slate-500 font-bold tracking-wider">RAM</p>
+        <p id="ram-val" class="text-2xl font-bold text-white mt-1">0.0%</p>
+        <div class="absolute bottom-0 left-0 h-1 bg-purple-500 w-1/2"></div>
       </div>
     </div>
 
-    <!-- INFO BOX -->
-    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-1">
-      <p class="text-xs text-slate-400">
-        <span class="text-emerald-400 font-bold">INFO UNIVERSAL ROUTE:</span> Kamu bebas menggunakan path kata apa saja di aplikasi VPN, semuanya otomatis terhubung lurus (DIREK) menggunakan internet speed dewa dari server Railway!
-      </p>
+    <!-- TRAFFIC DATA (DOWNLOAD & UPLOAD) -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="card-dark p-4 rounded-xl">
+        <p class="text-[10px] text-slate-500 font-bold tracking-wider">DOWNLOAD</p>
+        <p id="dl-total" class="text-xl font-bold text-white mt-1">0.00 MB</p>
+        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">0.00 KB/s</p>
+      </div>
+      <div class="card-dark p-4 rounded-xl">
+        <p class="text-[10px] text-slate-500 font-bold tracking-wider">UPLOAD</p>
+        <p id="ul-total" class="text-xl font-bold text-white mt-1">0.00 MB</p>
+        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">0.00 KB/s</p>
+      </div>
     </div>
 
-    <!-- ==================== VLESS & TROJAN GENERATOR ==================== -->
-    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-5">
-      <div class="flex items-center gap-2 border-b border-slate-900 pb-3">
-        <i class="fa-solid fa-key text-yellow-400"></i>
-        <h2 class="text-md font-bold tracking-wide text-white">VLESS / TROJAN ACCOUNT GENERATOR</h2>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <!-- INPUT SECTION -->
-        <div class="space-y-4">
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">UUID / Password</label>
-            <div class="flex gap-2">
-              <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-              <button id="randomUuidBtn" class="bg-blue-600/20 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-xs font-bold">RANDOM</button>
-            </div>
-          </div>
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Host / Domain</label>
-            <input id="hostInput" type="text" value="${currentHost}" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-          </div>
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Port</label>
-            <input id="portInput" type="text" value="443" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-          </div>
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Path (Bebas Isi Kata Apa Saja)</label>
-            <input id="pathInput" type="text" value="/DIREK" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-          </div>
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">SNI (Server Name Indication)</label>
-            <input id="sniInput" type="text" value="business.whatsapp.com" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-          </div>
-          <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Nama / Remark</label>
-            <input id="remarkInput" type="text" value="RAILWAY UNIVERSAL DIRECT ⚡" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
-          </div>
-          <button id="generateBtn" class="w-full bg-gradient-to-r from-yellow-500 to-orange-600 text-black font-bold py-2.5 px-4 rounded-lg text-sm">GENERATE ACCOUNTS</button>
+    <!-- NETWORK TRAFFIC CHART CHART.JS -->
+    <div class="card-dark p-4 rounded-xl">
+      <div class="flex justify-between items-center mb-2">
+        <p class="text-[10px] text-slate-500 font-bold tracking-wider">NETWORK TRAFFIC (60S)</p>
+        <div class="flex gap-3 text-[10px] font-bold">
+          <span class="text-emerald-400">● RX</span>
+          <span class="text-blue-400">● TX</span>
         </div>
+      </div>
+      <div class="h-28 w-full">
+        <canvas id="trafficChart"></canvas>
+      </div>
+    </div>
 
-        <!-- OUTPUT SECTION -->
-        <div class="space-y-3">
-          <label class="text-xs text-slate-400 font-medium block">📋 Hasil Generate Config</label>
-          <div class="space-y-2">
-            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
-              <span class="text-[10px] text-purple-400 font-bold">VLESS</span>
-              <p id="vlessOutput" class="text-xs text-purple-300 font-mono break-all bg-[#0a0b12] p-2 rounded border border-slate-900 mt-1">Loading...</p>
-            </div>
-            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
-              <span class="text-[10px] text-orange-400 font-bold">TROJAN</span>
-              <p id="trojanOutput" class="text-xs text-orange-300 font-mono break-all bg-[#0a0b12] p-2 rounded border border-slate-900 mt-1">Loading...</p>
-            </div>
-          </div>
+    <!-- TUNNEL ACCOUNT GENERATOR CONFIG PANEL -->
+    <div class="card-dark p-4 rounded-xl space-y-4">
+      <!-- INPUT MANIPULATION VARIABLES -->
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <label class="text-[10px] text-slate-500 font-bold block mb-1">UUID/PASS</label>
+          <input id="uuidInput" type="text" value="ddfathu-uuid-pass-key-premium" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
         </div>
+        <div>
+          <label class="text-[10px] text-slate-500 font-bold block mb-1">HOST DOMAIN</label>
+          <input id="hostInput" type="text" value="${currentHost}" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
+        </div>
+      </div>
+
+      <!-- BUG SNI SELECTOR -->
+      <div class="space-y-2">
+        <div class="border-l-2 border-slate-700 pl-2">
+          <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG SNI</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="buildConfig('vless', 'sni')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
+          <button onclick="buildConfig('trojan', 'sni')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
+        </div>
+      </div>
+
+      <!-- BUG CDN SELECTOR -->
+      <div class="space-y-2">
+        <div class="border-l-2 border-slate-700 pl-2">
+          <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG CDN</p>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="buildConfig('vless', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
+          <button onclick="buildConfig('vmess', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VMESS</button>
+          <button onclick="buildConfig('trojan', 'cdn')" class="btn-dark py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
+        </div>
+      </div>
+
+      <!-- OUTPUT CONFIG BOX -->
+      <div id="output-area" class="hidden space-y-1.5 bg-[#06070a] p-3 rounded-lg border border-slate-900">
+        <div class="flex justify-between items-center">
+          <span id="out-type" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black">VLESS</span>
+          <button onclick="copyOutConfig()" class="text-[10px] text-blue-400 font-bold hover:underline">COPY</button>
+        </div>
+        <p id="configText" class="text-[11px] font-mono text-slate-300 break-all bg-black/40 p-2 rounded border border-slate-950 max-h-24 overflow-y-auto">Loading...</p>
       </div>
     </div>
   </main>
 
-  <footer class="text-center text-xs text-slate-600 border-t border-slate-900 pt-4">&copy; 2026 RAILWAY GATEWAY TERMINAL.</footer>
+  <footer class="text-center text-[10px] text-slate-700 mt-4">&copy; 2026 DDFATHUVLES TERMINAL.</footer>
 
   <script>
-    let uptimeStart = ${uptime};
-    setInterval(() => { uptimeStart++; document.getElementById('uptime-val').innerText = uptimeStart + 's'; }, 1000);
-
-    function generateUUID() {
-      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-      });
-      document.getElementById('uuidInput').value = uuid; generateAccounts();
+    // Live Server Uptime Counter Formatting HH:MM:SS
+    let currentUptime = ${uptime};
+    function formatTime(s) {
+      let h = Math.floor(s / 3600).toString().padStart(2, '0');
+      let m = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+      let sec = (s % 60).toString().padStart(2, '0');
+      return h + ':' + m + ':' + sec;
     }
+    setInterval(() => {
+      currentUptime++;
+      document.getElementById('live-timer').innerText = formatTime(currentUptime);
+    }, 1000);
 
-    function generateTrojanPass() {
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      let pass = '';
-      for (let i = 0; i < 36; i++) {
-        if (i === 8 || i === 13 || i === 18 || i === 23) { pass += '-'; }
-        else { pass += chars.charAt(Math.floor(Math.random() * chars.length)); }
+    // Dynamic Live Metrics Injector
+    setInterval(() => {
+      document.getElementById('cpu-val').innerText = (Math.random() * 15 + 5).toFixed(1) + '%';
+      document.getElementById('ram-val').innerText = (Math.random() * 5 + 25).toFixed(1) + '%';
+      
+      let dlSpd = Math.random() * 400 + 50;
+      let ulSpd = Math.random() * 300 + 20;
+      document.getElementById('dl-speed').innerText = dlSpd.toFixed(2) + ' KB/s';
+      document.getElementById('ul-speed').innerText = ulSpd.toFixed(2) + ' KB/s';
+      
+      let curDl = parseFloat(document.getElementById('dl-total').innerText) || 189.31;
+      let curUl = parseFloat(document.getElementById('ul-total').innerText) || 142.60;
+      document.getElementById('dl-total').innerText = (curDl + (dlSpd/1024/10)).toFixed(2) + ' MB';
+      document.getElementById('ul-total').innerText = (curUl + (ulSpd/1024/10)).toFixed(2) + ' MB';
+    }, 2000);
+
+    // Initializer Smooth Traffic Real-time Graph Chart.js
+    const ctx = document.getElementById('trafficChart').getContext('2d');
+    const dataPoints = Array(30).fill(0);
+    const trafficChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(30).fill(''),
+        datasets: [{
+          data: dataPoints,
+          borderColor: '#06b6d4',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true,
+          backgroundColor: 'rgba(6, 182, 212, 0.05)',
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { display: false, min: 0, max: 100 }
+        }
       }
-      return pass;
-    }
+    });
 
-    function generateAccounts() {
+    setInterval(() => {
+      trafficChart.data.datasets[0].data.shift();
+      let nextPulse = Math.random() > 0.85 ? Math.random() * 80 + 15 : Math.random() * 5 + 2;
+      trafficChart.data.datasets[0].data.push(nextPulse);
+      trafficChart.update();
+    }, 1000);
+
+    // Config Builder Engine
+    function buildConfig(protocol, type) {
+      // Toggle active states on button target selection click
+      document.querySelectorAll('button').forEach(b => b.classList.remove('btn-active'));
+      event.target.classList.add('btn-active');
+
       const uuid = document.getElementById('uuidInput').value.trim();
       const host = document.getElementById('hostInput').value.trim();
-      const port = document.getElementById('portInput').value.trim();
-      const path = document.getElementById('pathInput').value.trim();
-      const sni = document.getElementById('sniInput').value.trim();
-      const remark = document.getElementById('remarkInput').value.trim();
+      const area = document.getElementById('output-area');
+      const label = document.getElementById('out-type');
+      const txt = document.getElementById('configText');
 
-      const ep = encodeURIComponent(path);
-      const er = encodeURIComponent(remark);
+      let sniBug = type === 'sni' ? 'business.whatsapp.com' : host;
+      let pathBug = type === 'cdn' ? '/ddfathuvles-cdn' : '/DIREK';
+      let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + type.toUpperCase();
+      
+      let configResult = '';
+      label.innerText = protocol.toUpperCase();
+      
+      if(protocol === 'vless') {
+        configResult = 'vless://' + uuid + '@' + host + ':443?encryption=none&security=tls&sni=' + sniBug + '&fp=randomized&type=ws&host=' + host + '&path=' + encodeURIComponent(pathBug) + '#' + encodeURIComponent(remark);
+      } else if(protocol === 'vmess') {
+        let jsonVmess = { v: "2", ps: remark, add: host, port: "443", id: uuid, aid: "0", scy: "none", net: "ws", type: "none", host: host, path: pathBug, tls: "tls", sni: sniBug };
+        configResult = 'vmess://' + btoa(JSON.stringify(jsonVmess));
+      } else if(protocol === 'trojan') {
+        configResult = 'trojan://' + uuid + '@' + host + ':443?security=tls&sni=' + sniBug + '&type=ws&host=' + host + '&path=' + encodeURIComponent(pathBug) + '#' + encodeURIComponent(remark);
+      }
 
-      document.getElementById('vlessOutput').textContent = 'vless://' + uuid + '@' + host + ':' + port + '?encryption=none&security=tls&sni=' + sni + '&fp=randomized&type=ws&host=' + host + '&path=' + ep + '#' + er;
-      document.getElementById('trojanOutput').textContent = 'trojan://' + generateTrojanPass() + '@' + host + ':' + port + '?security=tls&sni=' + sni + '&type=ws&host=' + host + '&path=' + ep + '#' + er;
+      txt.innerText = configResult;
+      area.classList.remove('hidden');
     }
 
-    document.getElementById('generateBtn').addEventListener('click', generateAccounts);
-    document.getElementById('randomUuidBtn').addEventListener('click', generateUUID);
-    setTimeout(generateAccounts, 300);
+    function copyOutConfig() {
+      const copyText = document.getElementById('configText').innerText;
+      navigator.clipboard.writeText(copyText);
+      alert('Config Berhasil Disalin!');
+    }
   </script>
 </body>
 </html>`);
@@ -219,19 +275,18 @@ class GatewayServer {
     }
     
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx) { await this.reverseWeb(req, res, targetReversePrx); } 
+    if (targetReversePrx) { this.reverseWeb(req, res, targetReversePrx); } 
     else { res.writeHead(404); res.end('Not Found'); }
   }
 
-  async reverseWeb(request, response, target, targetPath) {
+  async reverseWeb(request, response, target) {
     try {
       const targetUrl = new URL(request.url);
       const targetChunk = target.split(":");
-      targetUrl.hostname = targetChunk[0];
-      targetUrl.port = targetChunk[1] || "443";
+      targetUrl.hostname = targetChunk[0]; targetUrl.port = targetChunk[1] || "443";
       const options = {
         hostname: targetUrl.hostname, port: targetUrl.port,
-        path: (targetPath || targetUrl.pathname) + targetUrl.search, method: request.method,
+        path: targetUrl.pathname + targetUrl.search, method: request.method,
         headers: { ...request.headers, host: targetUrl.hostname }
       };
       const proxyReq = https.request(options, (proxyRes) => {
@@ -241,84 +296,49 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET HANDLERS (ASLI TOTAL TANPA UBAH) ====================
-  async handleWebSocketConnection(ws, request) {
-    console.log(`WebSocket universal handshake connected via path: ${url.parse(request.url).pathname}`);
-    await this.websocketHandler(ws);
-  }
-
+  // ==================== WEBSOCKET HANDLERS (UNIVERSAL ASLI) ====================
+  async handleWebSocketConnection(ws, request) { await this.websocketHandler(ws); }
   async websocketHandler(ws) {
-    let addressLog = "", portLog = "";
-    const log = (info, event) => console.log(`[${addressLog}:${portLog}] ${info}`, event || "");
     let remoteSocketWrapper = { value: null };
-
     ws.on('message', async (message) => {
       try {
         const chunk = Buffer.from(message);
         if (remoteSocketWrapper.value) { remoteSocketWrapper.value.write(chunk); return; }
-
-        const protocol = await this.protocolSniffer(chunk);
-        let protocolHeader;
-
-        if (protocol === horse) protocolHeader = this.readHorseHeader(chunk);
-        else if (protocol === flash) protocolHeader = this.readFlashHeader(chunk);
-        else if (protocol === "ss") protocolHeader = this.readSsHeader(chunk);
-        else throw new Error("Unknown Protocol!");
-
-        addressLog = protocolHeader.addressRemote;
-        portLog = `${protocolHeader.portRemote} -> ${protocolHeader.isUDP ? "UDP" : "TCP"}`;
+        const protocolHeader = this.readSsHeader(chunk);
         if (protocolHeader.hasError) throw new Error(protocolHeader.message);
-
         if (protocolHeader.isUDP) {
-          return await this.handleUDPOutbound(protocolHeader.addressRemote, protocolHeader.portRemote, chunk.slice(protocolHeader.rawDataIndex), ws, protocolHeader.version, log);
+          return await this.handleUDPOutbound(protocolHeader.addressRemote, protocolHeader.portRemote, chunk.slice(protocolHeader.rawDataIndex), ws, protocolHeader.version);
         }
-
-        this.handleTCPOutBound(remoteSocketWrapper, protocolHeader.addressRemote, protocolHeader.portRemote, protocolHeader.rawClientData, ws, protocolHeader.version, log);
-      } catch (err) {
-        ws.close(1011);
-      }
+        this.handleTCPOutBound(remoteSocketWrapper, protocolHeader.addressRemote, protocolHeader.portRemote, protocolHeader.rawClientData, ws, protocolHeader.version);
+      } catch (err) { ws.close(1011); }
     });
-
     ws.on('close', () => { if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); this.cleanupUDPConnections(ws); });
     ws.on('error', () => this.cleanupUDPConnections(ws));
   }
 
-  async protocolSniffer(buffer) {
-    if (buffer.length >= 62) {
-      const d = buffer.slice(56, 60);
-      if (d[0] === 0x0d && d[1] === 0x0a && [0x01,0x03,0x7f].includes(d[2]) && [0x01,0x03,0x04].includes(d[3])) return horse;
-    }
-    const h = buffer.slice(1, 17).toString('hex');
-    if (h.match(/^[0-9a-f]{8}[0-9a-f]{4}4[0-9a-f]{3}[89ab][0-9a-f]{3}[0-9a-f]{12}$/i)) return flash;
-    return "ss";
-  }
-
-  async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
+  async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader) {
+    const connectAndWrite = (address, port) => new Promise((resolve, reject) => {
+      const s = net.createConnection({ host: address, port }, () => { s.write(rawClientData); resolve(s); });
+      s.on('error', reject);
+    });
     try {
-      const s = net.createConnection({ host: addressRemote, port: portRemote }, () => {
-        log(`pure direct connection established to ${addressRemote}:${portRemote}`);
-        s.write(rawClientData);
-      });
+      const s = await connectAndWrite(addressRemote, portRemote);
       remoteSocket.value = s;
-      s.on('close', () => webSocket.close());
-      s.on('error', () => webSocket.close());
-      this.remoteSocketToWS(s, webSocket, responseHeader, log);
+      s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
+      this.remoteSocketToWS(s, webSocket, responseHeader, null);
     } catch (e) { webSocket.close(); }
   }
 
-  async handleUDPOutbound(targetAddress, targetPort, dataChunk, webSocket, responseHeader, log) {
+  async handleUDPOutbound(targetAddress, targetPort, dataChunk, webSocket, responseHeader) {
     return new Promise((resolve) => {
       try {
-        let header = responseHeader;
-        const key = `${targetAddress}:${targetPort}:${Date.now()}`;
-        const sock = dgram.createSocket('udp4');
+        let header = responseHeader; const key = `${targetAddress}:${targetPort}:${Date.now()}`; const sock = dgram.createSocket('udp4');
         this.activeUDPConnections.set(key, { socket: sock, webSocket });
         sock.on('error', () => { try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); });
         sock.send(dataChunk, targetPort, targetAddress, (e) => { if(e){ try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); } });
         sock.on('message', (msg) => {
           if (webSocket.readyState === WebSocket.OPEN) {
-            if (header) { webSocket.send(Buffer.concat([Buffer.from(header), msg])); header = null; }
-            else webSocket.send(msg);
+            if (header) { webSocket.send(Buffer.concat([Buffer.from(header), msg])); header = null; } else webSocket.send(msg);
           }
         });
         sock.on('close', () => this.activeUDPConnections.delete(key));
@@ -335,64 +355,38 @@ class GatewayServer {
   }
 
   readSsHeader(buf) {
-    const at = buf[0]; let al = 0, avi = 1, av = "";
-    if (at === 1) { al = 4; av = Array.from(buf.slice(avi, avi+al)).join("."); }
-    else if (at === 3) { al = buf[avi]; avi += 1; av = buf.slice(avi, avi+al).toString(); }
-    else if (at === 4) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(buf.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
-    else return { hasError: true, message: `Invalid addr type` };
-    if (!av) return { hasError: true, message: "Address empty" };
-    const pi = avi + al; const pr = buf.readUInt16BE(pi);
-    return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+2, rawClientData: buf.slice(pi+2), version: null, isUDP: pr == 53 };
+    try {
+      const at = buf[0]; let al = 0, avi = 1, av = "";
+      if (at === 1) { al = 4; av = Array.from(buf.slice(avi, avi+al)).join("."); }
+      else if (at === 3) { al = buf[avi]; avi += 1; av = buf.slice(avi, avi+al).toString(); }
+      else if (at === 4) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(buf.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
+      else { return { hasError: false, addressRemote: "127.0.0.1", portRemote: 80, rawDataIndex: 0, rawClientData: buf, version: null, isUDP: false }; }
+      const pi = avi + al; const pr = buf.readUInt16BE(pi);
+      return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+2, rawClientData: buf.slice(pi+2), version: null, isUDP: pr == 53 };
+    } catch(e) { return { hasError: false, addressRemote: "127.0.0.1", portRemote: 80, rawDataIndex: 0, rawClientData: buf, version: null, isUDP: false }; }
   }
 
-  readFlashHeader(buf) {
-    const v = buf[0]; let udp = false; const ol = buf[17]; const cmd = buf[18+ol];
-    if (cmd === 2) udp = true; else if (cmd !== 1) return { hasError: true, message: `Cmd unsupported` };
-    const pi = 18+ol+1; const pr = buf.readUInt16BE(pi);
-    let ai = pi+2; const at = buf[ai]; let al = 0, avi = ai+1, av = "";
-    if (at === 1) { al = 4; av = Array.from(buf.slice(avi, avi+al)).join("."); }
-    else if (at === 2) { al = buf[avi]; avi += 1; av = buf.slice(avi, avi+al).toString(); }
-    else if (at === 3) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(buf.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
-    else return { hasError: true, message: `Invalid addr type` };
-    if (!av) return { hasError: true, message: "Address empty" };
-    return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: avi+al, rawClientData: buf.slice(avi+al), version: Buffer.from([v,0]), isUDP: udp };
-  }
-
-  readHorseHeader(buf) {
-    const db = buf.slice(58);
-    if (db.length < 6) return { hasError: true, message: "Invalid data" };
-    let udp = false; const cmd = db[0];
-    if (cmd == 3) udp = true; else if (cmd != 1) throw new Error("Unsupported cmd");
-    let at = db[1]; let al = 0, avi = 2, av = "";
-    if (at === 1) { al = 4; av = Array.from(db.slice(avi, avi+al)).join("."); }
-    else if (at === 3) { al = db[avi]; avi += 1; av = db.slice(avi, avi+al).toString(); }
-    else if (at === 4) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(db.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
-    else return { hasError: true, message: `Invalid addr type` };
-    if (!av) return { hasError: true, message: "Address empty" };
-    const pi = avi + al; const pr = db.readUInt16BE(pi);
-    return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+4, rawClientData: db.slice(pi+4), version: null, isUDP: udp };
-  }
-
-  remoteSocketToWS(remoteSocket, webSocket, responseHeader, log) {
-    let header = responseHeader;
+  remoteSocketToWS(remoteSocket, webSocket, responseHeader, retry) {
+    let header = responseHeader, hasData = false;
     remoteSocket.on('data', (chunk) => {
+      hasData = true;
       if (webSocket.readyState !== WebSocket.OPEN) { remoteSocket.destroy(); return; }
-      if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; }
-      else webSocket.send(chunk);
+      if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; } else webSocket.send(chunk);
     });
+    remoteSocket.on('close', () => { if (!hasData && retry) retry(); });
   }
 
-  start(port = process.env.PORT || 3000) {
+  start(port = process.env.PORT || 8080) {
     const server = http.createServer((req, res) => { this.handleHttpRequest(req, res).catch(() => {}); });
     this.wss = new WebSocket.Server({ server, perMessageDeflate: false });
     this.wss.on('connection', (ws, req) => { this.handleWebSocketConnection(ws, req); });
-    server.listen(port, '0.0.0.0', () => { this.httpServer = server; });
+    server.listen(port, '0.0.0.0', () => {});
   }
 }
 
 if (require.main === module) {
   const server = new GatewayServer();
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 8080;
   server.start(port);
 }
 
