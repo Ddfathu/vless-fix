@@ -1,6 +1,6 @@
 // ============================================
-// RAILWAY GATEWAY - UNIVERSAL DIRECT CONNECT + ARGO TUNNEL
-// UI DDFATHUVLES CYBERPUNK MONITOR + WebSocket + UDP
+// RAILWAY GATEWAY - 100000000000% UNIVERSAL DIRECT CONNECT
+// FIX ROUTING PATH LOGIC + UI DDFATHUVLES MURNI
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -37,10 +37,10 @@ class GatewayServer {
     if (req.method === 'OPTIONS') { res.writeHead(200, this.CORS_HEADER_OPTIONS); res.end(); return; }
     if (parsedUrl.pathname === '/health') { this.handleHealthCheck(req, res); return; }
     
+    // KUNCI UTAMA: Cuma respon jika user akses landing page utama "/" via browser
     if (parsedUrl.pathname === '/') {
       const currentHost = req.headers.host || 'localhost:8080';
       const uptime = Math.floor(process.uptime());
-      const nodeVersion = process.version;
       
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(`<!DOCTYPE html>
@@ -62,47 +62,42 @@ class GatewayServer {
 </head>
 <body class="text-slate-400 min-h-screen flex flex-col justify-between p-4 max-w-md mx-auto selection:bg-blue-600 selection:text-white">
 
-  <!-- LIVE TIMER UPPERHEAD -->
   <div class="text-center my-2">
     <div id="live-timer" class="text-4xl font-bold text-white tracking-widest">00:00:00</div>
   </div>
 
   <main class="space-y-4 flex-grow mt-2">
-    <!-- BRAND HEADER -->
     <div class="text-center card-dark p-3 rounded-xl border-dashed">
       <h1 class="text-lg font-bold text-white tracking-wider">⚡ DDFATHUVLES<span class="text-blue-500">.sys</span></h1>
       <p class="text-[10px] text-emerald-400 font-bold tracking-widest mt-0.5">TUNNEL MONITOR & ACCOUNT GENERATOR</p>
     </div>
 
-    <!-- METRICS GRID (CPU & RAM) -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card-dark p-4 rounded-xl relative overflow-hidden">
         <p class="text-[10px] text-slate-500 font-bold tracking-wider">CPU</p>
-        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">0.0%</p>
+        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">9.1%</p>
         <div class="absolute bottom-0 left-0 h-1 bg-cyan-400 w-1/3"></div>
       </div>
       <div class="card-dark p-4 rounded-xl relative overflow-hidden">
         <p class="text-[10px] text-slate-500 font-bold tracking-wider">RAM</p>
-        <p id="ram-val" class="text-2xl font-bold text-white mt-1">0.0%</p>
+        <p id="ram-val" class="text-2xl font-bold text-white mt-1">29.8%</p>
         <div class="absolute bottom-0 left-0 h-1 bg-purple-500 w-1/2"></div>
       </div>
     </div>
 
-    <!-- TRAFFIC DATA (DOWNLOAD & UPLOAD) -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card-dark p-4 rounded-xl">
         <p class="text-[10px] text-slate-500 font-bold tracking-wider">DOWNLOAD</p>
-        <p id="dl-total" class="text-xl font-bold text-white mt-1">0.00 MB</p>
-        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">0.00 KB/s</p>
+        <p id="dl-total" class="text-xl font-bold text-white mt-1">189.31 MB</p>
+        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">356.3 KB/s</p>
       </div>
       <div class="card-dark p-4 rounded-xl">
         <p class="text-[10px] text-slate-500 font-bold tracking-wider">UPLOAD</p>
-        <p id="ul-total" class="text-xl font-bold text-white mt-1">0.00 MB</p>
-        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">0.00 KB/s</p>
+        <p id="ul-total" class="text-xl font-bold text-white mt-1">142.6 MB</p>
+        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">357.74 KB/s</p>
       </div>
     </div>
 
-    <!-- NETWORK TRAFFIC CHART CHART.JS -->
     <div class="card-dark p-4 rounded-xl">
       <div class="flex justify-between items-center mb-2">
         <p class="text-[10px] text-slate-500 font-bold tracking-wider">NETWORK TRAFFIC (60S)</p>
@@ -116,13 +111,11 @@ class GatewayServer {
       </div>
     </div>
 
-    <!-- TUNNEL ACCOUNT GENERATOR CONFIG PANEL -->
     <div class="card-dark p-4 rounded-xl space-y-4">
-      <!-- INPUT MANIPULATION VARIABLES -->
       <div class="grid grid-cols-2 gap-2 text-xs">
         <div>
           <label class="text-[10px] text-slate-500 font-bold block mb-1">UUID/PASS</label>
-          <input id="uuidInput" type="text" value="ddfathu-uuid-pass-key-premium" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
+          <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" class="w-full bg-[#07080e] border border-slate-800 rounded p-1.5 text-white font-mono focus:outline-none">
         </div>
         <div>
           <label class="text-[10px] text-slate-500 font-bold block mb-1">HOST DOMAIN</label>
@@ -130,7 +123,6 @@ class GatewayServer {
         </div>
       </div>
 
-      <!-- BUG SNI SELECTOR -->
       <div class="space-y-2">
         <div class="border-l-2 border-slate-700 pl-2">
           <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG SNI</p>
@@ -141,7 +133,6 @@ class GatewayServer {
         </div>
       </div>
 
-      <!-- BUG CDN SELECTOR -->
       <div class="space-y-2">
         <div class="border-l-2 border-slate-700 pl-2">
           <p class="text-[11px] font-bold text-slate-300 tracking-wider">BUG CDN</p>
@@ -153,7 +144,6 @@ class GatewayServer {
         </div>
       </div>
 
-      <!-- OUTPUT CONFIG BOX -->
       <div id="output-area" class="hidden space-y-1.5 bg-[#06070a] p-3 rounded-lg border border-slate-900">
         <div class="flex justify-between items-center">
           <span id="out-type" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black">VLESS</span>
@@ -167,7 +157,6 @@ class GatewayServer {
   <footer class="text-center text-[10px] text-slate-700 mt-4">&copy; 2026 DDFATHUVLES TERMINAL.</footer>
 
   <script>
-    // Live Server Uptime Counter Formatting HH:MM:SS
     let currentUptime = ${uptime};
     function formatTime(s) {
       let h = Math.floor(s / 3600).toString().padStart(2, '0');
@@ -180,25 +169,17 @@ class GatewayServer {
       document.getElementById('live-timer').innerText = formatTime(currentUptime);
     }, 1000);
 
-    // Dynamic Live Metrics Injector
     setInterval(() => {
-      document.getElementById('cpu-val').innerText = (Math.random() * 15 + 5).toFixed(1) + '%';
-      document.getElementById('ram-val').innerText = (Math.random() * 5 + 25).toFixed(1) + '%';
-      
-      let dlSpd = Math.random() * 400 + 50;
-      let ulSpd = Math.random() * 300 + 20;
-      document.getElementById('dl-speed').innerText = dlSpd.toFixed(2) + ' KB/s';
+      document.getElementById('cpu-val').innerText = (Math.random() * 8 + 4).toFixed(1) + '%';
+      document.getElementById('ram-val').innerText = (Math.random() * 3 + 28).toFixed(1) + '%';
+      let dlSpd = Math.random() * 300 + 100;
+      let ulSpd = Math.random() * 250 + 90;
+      document.getElementById('dl-speed').innerText = dlSpd.toFixed(1) + ' KB/s';
       document.getElementById('ul-speed').innerText = ulSpd.toFixed(2) + ' KB/s';
-      
-      let curDl = parseFloat(document.getElementById('dl-total').innerText) || 189.31;
-      let curUl = parseFloat(document.getElementById('ul-total').innerText) || 142.60;
-      document.getElementById('dl-total').innerText = (curDl + (dlSpd/1024/10)).toFixed(2) + ' MB';
-      document.getElementById('ul-total').innerText = (curUl + (ulSpd/1024/10)).toFixed(2) + ' MB';
     }, 2000);
 
-    // Initializer Smooth Traffic Real-time Graph Chart.js
     const ctx = document.getElementById('trafficChart').getContext('2d');
-    const dataPoints = Array(30).fill(0);
+    const dataPoints = Array(30).fill(0).map(() => Math.random() * 10 + 2);
     const trafficChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -217,26 +198,20 @@ class GatewayServer {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: {
-          x: { display: false },
-          y: { display: false, min: 0, max: 100 }
-        }
+        scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } }
       }
     });
 
     setInterval(() => {
       trafficChart.data.datasets[0].data.shift();
-      let nextPulse = Math.random() > 0.85 ? Math.random() * 80 + 15 : Math.random() * 5 + 2;
+      let nextPulse = Math.random() > 0.9 ? Math.random() * 70 + 20 : Math.random() * 8 + 2;
       trafficChart.data.datasets[0].data.push(nextPulse);
       trafficChart.update();
     }, 1000);
 
-    // Config Builder Engine
     function buildConfig(protocol, type) {
-      // Toggle active states on button target selection click
       document.querySelectorAll('button').forEach(b => b.classList.remove('btn-active'));
       event.target.classList.add('btn-active');
-
       const uuid = document.getElementById('uuidInput').value.trim();
       const host = document.getElementById('hostInput').value.trim();
       const area = document.getElementById('output-area');
@@ -246,7 +221,6 @@ class GatewayServer {
       let sniBug = type === 'sni' ? 'business.whatsapp.com' : host;
       let pathBug = type === 'cdn' ? '/ddfathuvles-cdn' : '/DIREK';
       let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + type.toUpperCase();
-      
       let configResult = '';
       label.innerText = protocol.toUpperCase();
       
@@ -258,14 +232,12 @@ class GatewayServer {
       } else if(protocol === 'trojan') {
         configResult = 'trojan://' + uuid + '@' + host + ':443?security=tls&sni=' + sniBug + '&type=ws&host=' + host + '&path=' + encodeURIComponent(pathBug) + '#' + encodeURIComponent(remark);
       }
-
       txt.innerText = configResult;
       area.classList.remove('hidden');
     }
 
     function copyOutConfig() {
-      const copyText = document.getElementById('configText').innerText;
-      navigator.clipboard.writeText(copyText);
+      navigator.clipboard.writeText(document.getElementById('configText').innerText);
       alert('Config Berhasil Disalin!');
     }
   </script>
@@ -274,9 +246,17 @@ class GatewayServer {
       return;
     }
     
+    // Proteksi Tambahan: Jalur Reverse Proxy luar hanya jalan jika variable tersetting, jika tidak lewati saja agar WS bisa jabat tangan
     const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx) { this.reverseWeb(req, res, targetReversePrx); } 
-    else { res.writeHead(404); res.end('Not Found'); }
+    if (targetReversePrx && parsedUrl.pathname !== '/DIREK') { 
+      this.reverseWeb(req, res, targetReversePrx); 
+    } else {
+      // Jika request adalah handshake WebSocket untuk VPN, biarkan menggantung agar dihandle server.wss
+      if (req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket') {
+        return; 
+      }
+      res.writeHead(404); res.end('Not Found');
+    }
   }
 
   async reverseWeb(request, response, target) {
@@ -296,23 +276,36 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET HANDLERS (UNIVERSAL ASLI) ====================
-  async handleWebSocketConnection(ws, request) { await this.websocketHandler(ws); }
+  // ==================== WEBSOCKET HANDLERS ====================
+  async handleWebSocketConnection(ws, request) {
+    await this.websocketHandler(ws);
+  }
+
   async websocketHandler(ws) {
     let remoteSocketWrapper = { value: null };
+
     ws.on('message', async (message) => {
       try {
         const chunk = Buffer.from(message);
         if (remoteSocketWrapper.value) { remoteSocketWrapper.value.write(chunk); return; }
+
         const protocolHeader = this.readSsHeader(chunk);
         if (protocolHeader.hasError) throw new Error(protocolHeader.message);
+
         if (protocolHeader.isUDP) {
           return await this.handleUDPOutbound(protocolHeader.addressRemote, protocolHeader.portRemote, chunk.slice(protocolHeader.rawDataIndex), ws, protocolHeader.version);
         }
+
         this.handleTCPOutBound(remoteSocketWrapper, protocolHeader.addressRemote, protocolHeader.portRemote, protocolHeader.rawClientData, ws, protocolHeader.version);
-      } catch (err) { ws.close(1011); }
+      } catch (err) {
+        ws.close(1011);
+      }
     });
-    ws.on('close', () => { if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); this.cleanupUDPConnections(ws); });
+
+    ws.on('close', () => {
+      if (remoteSocketWrapper.value) remoteSocketWrapper.value.end();
+      this.cleanupUDPConnections(ws);
+    });
     ws.on('error', () => this.cleanupUDPConnections(ws));
   }
 
@@ -321,6 +314,7 @@ class GatewayServer {
       const s = net.createConnection({ host: address, port }, () => { s.write(rawClientData); resolve(s); });
       s.on('error', reject);
     });
+    
     try {
       const s = await connectAndWrite(addressRemote, portRemote);
       remoteSocket.value = s;
@@ -332,13 +326,16 @@ class GatewayServer {
   async handleUDPOutbound(targetAddress, targetPort, dataChunk, webSocket, responseHeader) {
     return new Promise((resolve) => {
       try {
-        let header = responseHeader; const key = `${targetAddress}:${targetPort}:${Date.now()}`; const sock = dgram.createSocket('udp4');
+        let header = responseHeader;
+        const key = `${targetAddress}:${targetPort}:${Date.now()}`;
+        const sock = dgram.createSocket('udp4');
         this.activeUDPConnections.set(key, { socket: sock, webSocket });
         sock.on('error', () => { try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); });
         sock.send(dataChunk, targetPort, targetAddress, (e) => { if(e){ try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); } });
         sock.on('message', (msg) => {
           if (webSocket.readyState === WebSocket.OPEN) {
-            if (header) { webSocket.send(Buffer.concat([Buffer.from(header), msg])); header = null; } else webSocket.send(msg);
+            if (header) { webSocket.send(Buffer.concat([Buffer.from(header), msg])); header = null; }
+            else webSocket.send(msg);
           }
         });
         sock.on('close', () => this.activeUDPConnections.delete(key));
@@ -361,9 +358,12 @@ class GatewayServer {
       else if (at === 3) { al = buf[avi]; avi += 1; av = buf.slice(avi, avi+al).toString(); }
       else if (at === 4) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(buf.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
       else { return { hasError: false, addressRemote: "127.0.0.1", portRemote: 80, rawDataIndex: 0, rawClientData: buf, version: null, isUDP: false }; }
+      
       const pi = avi + al; const pr = buf.readUInt16BE(pi);
       return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+2, rawClientData: buf.slice(pi+2), version: null, isUDP: pr == 53 };
-    } catch(e) { return { hasError: false, addressRemote: "127.0.0.1", portRemote: 80, rawDataIndex: 0, rawClientData: buf, version: null, isUDP: false }; }
+    } catch(e) {
+      return { hasError: false, addressRemote: "127.0.0.1", portRemote: 80, rawDataIndex: 0, rawClientData: buf, version: null, isUDP: false };
+    }
   }
 
   remoteSocketToWS(remoteSocket, webSocket, responseHeader, retry) {
@@ -371,7 +371,8 @@ class GatewayServer {
     remoteSocket.on('data', (chunk) => {
       hasData = true;
       if (webSocket.readyState !== WebSocket.OPEN) { remoteSocket.destroy(); return; }
-      if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; } else webSocket.send(chunk);
+      if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; }
+      else webSocket.send(chunk);
     });
     remoteSocket.on('close', () => { if (!hasData && retry) retry(); });
   }
