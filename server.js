@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - FULL COMPLETE (FIXED & UPGRADED)
+// RAILWAY GATEWAY - FULL COMPLETE (FIXED VLESS & PROXY)
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -13,7 +13,6 @@ const https = require('https');
 const url = require('url');
 
 // ==================== CUSTOM PROXY HARDCODE ====================
-// Format: /SG-DO, /G-SG, /G-PREMIUM, dll.
 const CUSTOM_PROXY = {
   "SG-GL": [
     "34.143.159.175:443"
@@ -127,7 +126,7 @@ class GatewayServer {
     this.httpServer = null;
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
-    this.isDirectRoute = false; // Flag tambahan untuk mendeteksi mode DIREK
+    this.isDirectRoute = false;
   }
 
   // ==================== HTTP HANDLERS ====================
@@ -197,7 +196,7 @@ class GatewayServer {
     }
   }
 
-  // ==================== MAIN HTTP HANDLER (UI CYBERPUNK FIXED) ====================
+  // ==================== MAIN HTTP HANDLER (UI CYBERPUNK) ====================
   async handleHttpRequest(req, res) {
     const parsedUrl = url.parse(req.url, true);
     
@@ -434,7 +433,7 @@ class GatewayServer {
       </div>
     </div>
 
-    <!-- ==================== VLESS & TROJAN GENERATOR ==================== -->
+    <!-- VLESS & TROJAN GENERATOR -->
     <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-5">
       <div class="flex items-center gap-2 border-b border-slate-900 pb-3">
         <i class="fa-solid fa-key text-yellow-400"></i>
@@ -810,19 +809,18 @@ class GatewayServer {
       const path = parsedUrl.pathname;
       console.log(`WebSocket request path: ${path}`);
       
-      // Reset flag route direct
       this.isDirectRoute = false;
 
-      // 1. FITUR BARU: PATH /DIREK (LANGSUNG TEMBAK IP RAILWAY)
+      // 1. PATH /DIREK (Railway Direct Outbound)
       if (path.toUpperCase() === '/DIREK') {
         this.isDirectRoute = true;
-        this.prxIP = ""; // Kosongkan proxy agar langsung bypass mentah ke Railway
+        this.prxIP = "";
         console.log(`[ROUTE-MODE] Active -> RAILWAY DIRECT IP`);
         await this.websocketHandler(ws);
         return;
       }
 
-      // 2. PERBAIKAN: DETEKSI CUSTOM PROXY HARDCODE (Contoh: /G-SG, /SG-DO)
+      // 2. DETEKSI CUSTOM PROXY HARDCODE (Contoh: /G-SG, /SG-DO)
       const customMatch = path.match(/^\/([A-Z0-9]{2,3}-[A-Za-z0-9_]+)$/i);
       if (customMatch) {
         const customKey = customMatch[1].toUpperCase();
@@ -1004,7 +1002,8 @@ class GatewayServer {
         const protocol = await this.protocolSniffer(chunk);
         let protocolHeader;
 
-        if (protocol === horse) protocolHeader = this.readHorseHeader(chunk);
+        // VLESS & Trojan diarahkan ke pembaca terpadu (readHorseHeader)
+        if (protocol === horse || protocol === "vless") protocolHeader = this.readHorseHeader(chunk);
         else if (protocol === flash) protocolHeader = this.readFlashHeader(chunk);
         else if (protocol === "ss") protocolHeader = this.readSsHeader(chunk);
         else throw new Error("Unknown Protocol!");
@@ -1042,6 +1041,11 @@ class GatewayServer {
     if (buffer.length >= 62) {
       const d = buffer.slice(56, 60);
       if (d[0] === 0x0d && d[1] === 0x0a && [0x01,0x03,0x7f].includes(d[2]) && [0x01,0x03,0x04].includes(d[3])) return horse;
+      
+      // Smart Check untuk VLESS WebSocket murni
+      if (buffer[0] === 0x00 || buffer[0] === 0x01) {
+        return "vless";
+      }
     }
     const h = buffer.slice(1, 17).toString('hex');
     if (h.match(/^[0-9a-f]{8}[0-9a-f]{4}4[0-9a-f]{3}[89ab][0-9a-f]{3}[0-9a-f]{12}$/i)) return flash;
@@ -1054,7 +1058,7 @@ class GatewayServer {
       s.on('error', reject);
     });
     
-    // JIKA /DIREK AKTIF, Langsung eksekusi koneksi tanpa proxy
+    // Bypass system jika menggunakan /DIREK
     if (this.isDirectRoute) {
       try {
         const s = await connectAndWrite(addressRemote, portRemote);
@@ -1069,10 +1073,8 @@ class GatewayServer {
       return;
     }
 
-    // ALUR NORMAL DENGAN PROXY RETRY SYSTEM BEREFEK
     const retry = async () => {
       try {
-        log(`Triggering proxy routing retry -> ${this.prxIP}`);
         const s = await connectAndWrite(this.prxIP.split(/[:=-]/)[0] || addressRemote, this.prxIP.split(/[:=-]/)[1] || portRemote);
         remoteSocket.value = s;
         s.on('close', () => webSocket.close());
@@ -1080,7 +1082,6 @@ class GatewayServer {
         this.remoteSocketToWS(s, webSocket, responseHeader, null, log);
       } catch(e) { webSocket.close(); }
     };
-
     try {
       const s = await connectAndWrite(addressRemote, portRemote);
       remoteSocket.value = s;
@@ -1145,20 +1146,41 @@ class GatewayServer {
   }
 
   readHorseHeader(buf) {
-    const db = buf.slice(58);
+    // Cek apakah paket data berupa VLESS WS murni (biasanya diawali byte 0x00 atau 0x01)
+    const isVless = buf[0] === 0x00 || buf[0] === 0x01;
+    // Jika VLESS, gunakan buffer penuh. Jika Trojan, potong padding 58 byte pertamanya.
+    const db = isVless ? buf : buf.slice(58);
+    
     if (db.length < 6) return { hasError: true, message: "Invalid data" };
     let udp = false;
     const cmd = db[0];
-    if (cmd == 3) udp = true; else if (cmd != 1) throw new Error("Unsupported cmd");
+    
+    if (cmd == 3) udp = true; 
+    else if (cmd != 1) {
+      // Fallback: Jika penanda VLESS meleset di awal, coba jalankan cara standard potong 58
+      if (isVless) return this.readHorseHeader(buf.slice(58));
+      return { hasError: true, message: "Unsupported cmd" };
+    }
+    
     let at = db[1]; let al = 0, avi = 2, av = "";
     if (at === 1) { al = 4; av = Array.from(db.slice(avi, avi+al)).join("."); }
     else if (at === 3) { al = db[avi]; avi += 1; av = db.slice(avi, avi+al).toString(); }
     else if (at === 4) { al = 16; const ip = []; for(let i=0;i<8;i++) ip.push(db.readUInt16BE(avi+i*2).toString(16)); av = ip.join(":"); }
     else return { hasError: true, message: `Invalid addr type: ${at}` };
+    
     if (!av) return { hasError: true, message: "Address empty" };
     const pi = avi + al;
     const pr = db.readUInt16BE(pi);
-    return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+4, rawClientData: db.slice(pi+4), version: null, isUDP: udp };
+    
+    return { 
+      hasError: false, 
+      addressRemote: av, 
+      portRemote: pr, 
+      rawDataIndex: isVless ? (pi + 2) : (pi + 4), 
+      rawClientData: isVless ? db.slice(pi + 2) : db.slice(pi + 4), 
+      version: isVless ? Buffer.from([buf[0], 0]) : null, 
+      isUDP: udp || pr == 53 
+    };
   }
 
   remoteSocketToWS(remoteSocket, webSocket, responseHeader, retry, log) {
