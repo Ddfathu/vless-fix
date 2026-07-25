@@ -31,7 +31,7 @@ class GatewayServer {
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
   }
 
-  // ==================== HTTP HANDLERS & UI ====================
+  // ==================== HTTP HANDLERS & UI GENERATOR ====================
   handleHealthCheck(req, res) {
     const healthData = {
       status: 'healthy',
@@ -63,16 +63,18 @@ class GatewayServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RAILWAY GATEWAY // UNIVERSAL DASHBOARD</title>
+  <title>RAILWAY GATEWAY // DASHBOARD</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
     body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
     .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
+    .neon-border:hover { border-color: rgba(59, 130, 246, 0.8); }
   </style>
 </head>
-<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6">
+<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6 selection:bg-blue-600 selection:text-white">
+
   <header class="border-b border-slate-900 pb-4 flex justify-between items-center max-w-7xl w-full mx-auto">
     <div>
       <h1 class="text-xl font-bold text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
@@ -80,21 +82,137 @@ class GatewayServer {
     </div>
     <div class="text-xs font-semibold text-emerald-400 bg-[#121420] px-4 py-2 rounded border border-blue-500/20">SYSTEM ONLINE</div>
   </header>
-  <main class="max-w-7xl w-full mx-auto my-8 space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
-        <h2 class="text-white font-bold">UNIVERSAL WEBSOCKET ENDPOINT</h2>
-        <p class="text-sm text-slate-300">Kamu bebas menggunakan path kata apa saja di aplikasi VPN, semuanya otomatis terhubung lurus (DIREK) menggunakan internet speed dewa dari server Railway!</p>
-        <p class="text-xs text-emerald-400 mt-2 font-bold">Contoh: ${protocolWs}://${currentHost}/BebasApaSaja</p>
+
+  <main class="max-w-7xl w-full mx-auto my-6 space-y-6 flex-grow">
+    
+    <!-- STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
+        <p class="text-xs text-slate-500 mb-1">SYSTEM UPTIME</p>
+        <p id="uptime-val" class="text-lg font-bold text-white">${uptime}s</p>
       </div>
-      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
-        <h2 class="text-white font-bold">MONITOR CORE</h2>
-        <p class="text-xs text-slate-400">Uptime: ${uptime}s | Allocation RAM: ${ramUsed} MB</p>
-        <p class="text-xs text-slate-400">Engine Node: ${nodeVersion}</p>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
+        <p class="text-xs text-slate-500 mb-1">RAM ALLOCATION</p>
+        <p class="text-lg font-bold text-white">${ramUsed} MB</p>
+      </div>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
+        <p class="text-xs text-slate-500 mb-1">TUNNEL STRATEGY</p>
+        <p class="text-lg font-bold text-emerald-400">PURE DIRECT</p>
+      </div>
+      <div class="bg-[#0d0e16] neon-border p-5 rounded-xl">
+        <p class="text-xs text-slate-500 mb-1">ENGINE VERSION</p>
+        <p class="text-lg font-bold text-blue-400">${nodeVersion}</p>
+      </div>
+    </div>
+
+    <!-- INFO BOX -->
+    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-1">
+      <p class="text-xs text-slate-400">
+        <span class="text-emerald-400 font-bold">INFO UNIVERSAL ROUTE:</span> Kamu bebas menggunakan path kata apa saja di aplikasi VPN, semuanya otomatis terhubung lurus (DIREK) menggunakan internet speed dewa dari server Railway!
+      </p>
+    </div>
+
+    <!-- ==================== VLESS & TROJAN GENERATOR ==================== -->
+    <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-5">
+      <div class="flex items-center gap-2 border-b border-slate-900 pb-3">
+        <i class="fa-solid fa-key text-yellow-400"></i>
+        <h2 class="text-md font-bold tracking-wide text-white">VLESS / TROJAN ACCOUNT GENERATOR</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- INPUT SECTION -->
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">UUID / Password</label>
+            <div class="flex gap-2">
+              <input id="uuidInput" type="text" value="853b8456-0c0b-4bfa-b3b4-b2619248a9bc" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+              <button id="randomUuidBtn" class="bg-blue-600/20 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-xs font-bold">RANDOM</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Host / Domain</label>
+            <input id="hostInput" type="text" value="${currentHost}" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Port</label>
+            <input id="portInput" type="text" value="443" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Path (Bebas Isi Kata Apa Saja)</label>
+            <input id="pathInput" type="text" value="/DIREK" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">SNI (Server Name Indication)</label>
+            <input id="sniInput" type="text" value="business.whatsapp.com" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Nama / Remark</label>
+            <input id="remarkInput" type="text" value="RAILWAY UNIVERSAL DIRECT ⚡" class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none">
+          </div>
+          <button id="generateBtn" class="w-full bg-gradient-to-r from-yellow-500 to-orange-600 text-black font-bold py-2.5 px-4 rounded-lg text-sm">GENERATE ACCOUNTS</button>
+        </div>
+
+        <!-- OUTPUT SECTION -->
+        <div class="space-y-3">
+          <label class="text-xs text-slate-400 font-medium block">📋 Hasil Generate Config</label>
+          <div class="space-y-2">
+            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
+              <span class="text-[10px] text-purple-400 font-bold">VLESS</span>
+              <p id="vlessOutput" class="text-xs text-purple-300 font-mono break-all bg-[#0a0b12] p-2 rounded border border-slate-900 mt-1">Loading...</p>
+            </div>
+            <div class="bg-[#07080e] rounded-lg p-4 border border-slate-950">
+              <span class="text-[10px] text-orange-400 font-bold">TROJAN</span>
+              <p id="trojanOutput" class="text-xs text-orange-300 font-mono break-all bg-[#0a0b12] p-2 rounded border border-slate-900 mt-1">Loading...</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </main>
+
   <footer class="text-center text-xs text-slate-600 border-t border-slate-900 pt-4">&copy; 2026 RAILWAY GATEWAY TERMINAL.</footer>
+
+  <script>
+    let uptimeStart = ${uptime};
+    setInterval(() => { uptimeStart++; document.getElementById('uptime-val').innerText = uptimeStart + 's'; }, 1000);
+
+    function generateUUID() {
+      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+      document.getElementById('uuidInput').value = uuid; generateAccounts();
+    }
+
+    function generateTrojanPass() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let pass = '';
+      for (let i = 0; i < 36; i++) {
+        if (i === 8 || i === 13 || i === 18 || i === 23) { pass += '-'; }
+        else { pass += chars.charAt(Math.floor(Math.random() * chars.length)); }
+      }
+      return pass;
+    }
+
+    function generateAccounts() {
+      const uuid = document.getElementById('uuidInput').value.trim();
+      const host = document.getElementById('hostInput').value.trim();
+      const port = document.getElementById('portInput').value.trim();
+      const path = document.getElementById('pathInput').value.trim();
+      const sni = document.getElementById('sniInput').value.trim();
+      const remark = document.getElementById('remarkInput').value.trim();
+
+      const ep = encodeURIComponent(path);
+      const er = encodeURIComponent(remark);
+
+      document.getElementById('vlessOutput').textContent = 'vless://' + uuid + '@' + host + ':' + port + '?encryption=none&security=tls&sni=' + sni + '&fp=randomized&type=ws&host=' + host + '&path=' + ep + '#' + er;
+      document.getElementById('trojanOutput').textContent = 'trojan://' + generateTrojanPass() + '@' + host + ':' + port + '?security=tls&sni=' + sni + '&type=ws&host=' + host + '&path=' + ep + '#' + er;
+    }
+
+    document.getElementById('generateBtn').addEventListener('click', generateAccounts);
+    document.getElementById('randomUuidBtn').addEventListener('click', generateUUID);
+    setTimeout(generateAccounts, 300);
+  </script>
 </body>
 </html>`);
       return;
@@ -123,9 +241,8 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET HANDLERS ====================
+  // ==================== WEBSOCKET HANDLERS (ASLI TOTAL TANPA UBAH) ====================
   async handleWebSocketConnection(ws, request) {
-    // Kunci Utama Universal Path: Semua path langsung diizinkan masuk dan diproses
     console.log(`WebSocket universal handshake connected via path: ${url.parse(request.url).pathname}`);
     await this.websocketHandler(ws);
   }
@@ -176,9 +293,7 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== PURE DIRECT OUTBOUND GENERATION ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
-    // 100% Langsung dilarikan lurus keluar menggunakan internet server Railway
     try {
       const s = net.createConnection({ host: addressRemote, port: portRemote }, () => {
         log(`pure direct connection established to ${addressRemote}:${portRemote}`);
