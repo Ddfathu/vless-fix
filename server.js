@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - FULL COMPLETE (HYBRID PROXY SECURED)
+// RAILWAY GATEWAY - FULL COMPLETE (OPTION 3: WS FORWARDING)
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -51,21 +51,6 @@ const CORS_HEADER_OPTIONS = {
 const REGION_MAP = {
   ASIA: ["ID", "SG", "MY", "PH", "TH", "VN", "JP", "KR", "CN", "HK", "TW"],
   SOUTHASIA: ["IN", "BD", "PK", "LK", "NP", "AF", "BT", "MV"],
-  CENTRALASIA: ["KZ", "UZ", "TM", "KG", "TJ"],
-  NORTHASIA: ["RU"],
-  MIDDLEEAST: ["AE", "SA", "IR", "IQ", "JO", "IL", "YE", "SY", "OM", "KW", "QA", "BH", "LB"],
-  CIS: ["RU", "UA", "BY", "KZ", "UZ", "AM", "GE", "MD", "TJ", "KG", "TM", "AZ"],
-  WESTEUROPE: ["FR", "DE", "NL", "BE", "AT", "CH", "IE", "LU", "MC"],
-  EASTEUROPE: ["PL", "CZ", "SK", "HU", "RO", "BG", "MD", "UA", "BY"],
-  NORTHEUROPE: ["SE", "FI", "NO", "DK", "EE", "LV", "LT", "IS"],
-  SOUTHEUROPE: ["IT", "ES", "PT", "GR", "HR", "SI", "MT", "AL", "BA", "RS", "ME", "MK"],
-  EUROPE: ["FR", "DE", "NL", "BE", "AT", "CH", "IE", "LU", "MC", "PL", "CZ", "SK", "HU", "RO", "BG", "MD", "UA", "BY", "SE", "FI", "NO", "DK", "EE", "LV", "LT", "IS", "IT", "ES", "PT", "GR", "HR", "SI", "MT", "AL", "BA", "RS", "ME", "MK"],
-  AFRICA: ["ZA", "NG", "EG", "MA", "KE", "DZ", "TN", "GH", "CI", "SN", "ET"],
-  NORTHAMERICA: ["US", "CA", "MX"],
-  SOUTHAMERICA: ["BR", "AR", "CL", "CO", "PE", "VE", "EC", "UY", "PY", "BO"],
-  LATAM: ["MX", "BR", "AR", "CL", "CO", "PE", "VE", "EC", "UY", "PY", "BO", "CR", "GT", "PA", "DO", "HN", "NI", "SV"],
-  AMERICA: ["US", "CA", "MX", "BR", "AR", "CL", "CO", "PE", "VE", "EC"],
-  OCEANIA: ["AU", "NZ", "PG", "FJ"],
   GLOBAL: []
 };
 
@@ -78,28 +63,17 @@ class GatewayServer {
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
     this.isDirectRoute = false;
-    this.fullBufferBackup = null; // Menyimpan buffer utuh awal
+    this.currentWsIncomingReq = null; // Menyimpan info request WS asal
   }
 
   // ==================== HTTP HANDLERS & UI ====================
   handleHealthCheck(req, res) {
-    const healthData = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      service: 'railway-gateway',
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      version: process.env.npm_package_version || '1.0.0',
-      features: { websocket: true, tcp: true, udp: true, protocols: ['trojan', 'vmess', 'ss'] }
-    };
+    const healthData = { status: 'healthy', uptime: process.uptime() };
     res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
     res.end(JSON.stringify(healthData, null, 2));
   }
 
-  handleCorsPreflight(req, res) {
-    res.writeHead(200, this.CORS_HEADER_OPTIONS);
-    res.end();
-  }
+  handleCorsPreflight(req, res) { res.writeHead(200, this.CORS_HEADER_OPTIONS); res.end(); }
 
   async handleApiRequest(req, res, parsedUrl) {
     try {
@@ -131,7 +105,6 @@ class GatewayServer {
       const protocolWs = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws';
       const uptime = Math.floor(process.uptime());
       const ramUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-      const nodeVersion = process.version;
       
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(`<!DOCTYPE html>
@@ -140,31 +113,20 @@ class GatewayServer {
   <meta charset="UTF-8">
   <title>RAILWAY GATEWAY // DASHBOARD</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght=300;400;500;700&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
+    body { font-family: monospace; background-color: #0a0b10; color: #cbd5e1; }
     .neon-border { border: 1px solid rgba(59, 130, 246, 0.3); }
   </style>
 </head>
-<body class="text-slate-300 min-h-screen flex flex-col justify-between p-6">
-  <header class="border-b border-slate-900 pb-4 flex justify-between items-center max-w-7xl w-full mx-auto">
-    <div>
-      <h1 class="text-xl font-bold text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
-      <p class="text-xs text-slate-500">PROXY TUNNEL ENGINE ONLINE</p>
+<body class="p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <h2 class="text-xl font-bold text-white">RAILWAY GATEWAY // WEBSOCKET FORWARDER ACTIVE</h2>
+    <div class="bg-[#0d0e16] neon-border p-6 rounded-xl">
+      <p>Mode DIREK: <span class="text-red-400">${protocolWs}://${currentHost}/DIREK</span></p>
+      <p>Mode PROXY WORKER: <span class="text-purple-400">${protocolWs}://${currentHost}/G-SG</span></p>
+      <p>RAM Allocation: ${ramUsed} MB | Uptime: ${uptime}s</p>
     </div>
-    <div class="text-xs font-semibold text-emerald-400 bg-[#121420] px-4 py-2 rounded border border-blue-500/20">SYSTEM ONLINE</div>
-  </header>
-  <main class="max-w-7xl w-full mx-auto my-8 space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-[#0d0e16] neon-border p-6 rounded-xl space-y-2">
-        <h2 class="text-white font-bold">ENDPOINTS ROUTE</h2>
-        <p class="text-xs text-slate-400">Direct Route: <span class="text-red-400">${protocolWs}://${currentHost}/DIREK</span></p>
-        <p class="text-xs text-slate-400">Hardcode Proxy Group: <span class="text-purple-400">${protocolWs}://${currentHost}/G-SG</span></p>
-        <p class="text-xs text-slate-400">Dynamic Cluster: <span class="text-blue-400">${protocolWs}://${currentHost}/ALL</span></p>
-      </div>
-    </div>
-  </main>
+  </div>
 </body>
 </html>`);
       return;
@@ -190,7 +152,7 @@ class GatewayServer {
       const response = await fetch(prxBankUrl);
       if (response.status === 200) {
         const data = await response.json();
-        if (!Array.isArray(data)) return []; 
+        if (!Array.isArray(data)) return [];
         return data.map(proxy => {
           const ip = proxy.prxIP || proxy.ip || proxy.server;
           const port = proxy.prxPort || proxy.port;
@@ -228,9 +190,10 @@ class GatewayServer {
     try {
       const parsedUrl = url.parse(request.url, true);
       const path = parsedUrl.pathname;
-      console.log(`WebSocket path connected: ${path}`);
+      console.log(`WebSocket request path: ${path}`);
 
       this.isDirectRoute = false;
+      this.currentWsIncomingReq = request; // Simpan info request incoming
 
       if (path.toUpperCase() === '/DIREK') {
         this.isDirectRoute = true;
@@ -276,10 +239,18 @@ class GatewayServer {
     ws.on('message', async (message) => {
       try {
         const chunk = Buffer.from(message);
-        if (remoteSocketWrapper.value) { remoteSocketWrapper.value.write(chunk); return; }
-
-        // Backup paket data utuh awal untuk dilempar jika mengaktifkan proxy
-        this.fullBufferBackup = chunk;
+        
+        // JIKA CLIENT SUDAH TERHUBUNG KE OUTBOUND: Teruskan data langsung
+        if (remoteSocketWrapper.value) {
+          if (remoteSocketWrapper.value instanceof WebSocket) {
+            if (remoteSocketWrapper.value.readyState === WebSocket.OPEN) {
+              remoteSocketWrapper.value.send(chunk);
+            }
+          } else {
+            remoteSocketWrapper.value.write(chunk);
+          }
+          return;
+        }
 
         const protocol = await this.protocolSniffer(chunk);
         let protocolHeader;
@@ -303,7 +274,13 @@ class GatewayServer {
       }
     });
 
-    ws.on('close', () => { if (remoteSocketWrapper.value) remoteSocketWrapper.value.end(); this.cleanupUDPConnections(ws); });
+    ws.on('close', () => {
+      if (remoteSocketWrapper.value) {
+        if (remoteSocketWrapper.value instanceof WebSocket) remoteSocketWrapper.value.close();
+        else remoteSocketWrapper.value.end();
+      }
+      this.cleanupUDPConnections(ws);
+    });
     ws.on('error', () => this.cleanupUDPConnections(ws));
   }
 
@@ -317,17 +294,17 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== PENANGANAN JALUR PROXY FIX (ANTI MACET) ====================
+  // ==================== ENGINE BARU LUAR BIASA (SISTEM OPERSAN WEBSOCKET HTTP) ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
-    const connectAndWrite = (address, port, dataToSend) => new Promise((resolve, reject) => {
-      const s = net.createConnection({ host: address, port }, () => { log(`connected out to ${address}:${port}`); s.write(dataToSend); resolve(s); });
-      s.on('error', reject);
-    });
     
-    // JIKA PATH /DIREK AKTIF: Tembak data potongan asli lurus keluar via IP Railway
+    // JIKA PATH /DIREK AKTIF: Pakai modul TCP mentah bawaan asli temen lu
     if (this.isDirectRoute || !this.prxIP) {
+      const connectAndWrite = (address, port) => new Promise((resolve, reject) => {
+        const s = net.createConnection({ host: address, port }, () => { log(`connected to ${address}:${port}`); s.write(rawClientData); resolve(s); });
+        s.on('error', reject);
+      });
       try {
-        const s = await connectAndWrite(addressRemote, portRemote, rawClientData);
+        const s = await connectAndWrite(addressRemote, portRemote);
         remoteSocket.value = s;
         s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
         this.remoteSocketToWS(s, webSocket, responseHeader, null, log);
@@ -335,24 +312,50 @@ class GatewayServer {
       return;
     }
 
-    // JIKA LEWAT PATH PROXY: Kirim backup paket data utuh (fullBufferBackup) agar handshake luar lolos
-    const retry = async () => {
-      try {
-        const [proxyHost, proxyPort] = this.prxIP.split(/[:=-]/);
-        const s = await connectAndWrite(proxyHost || addressRemote, parseInt(proxyPort) || portRemote, this.fullBufferBackup);
-        remoteSocket.value = s;
-        s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
-        this.remoteSocketToWS(s, webSocket, responseHeader, null, log);
-      } catch(e) { webSocket.close(); }
-    };
-
+    // JIKA MODE PROXY AKTIF: Ubah Railway menjadi Klien WebSocket untuk nembak HTTP Worker luar!
     try {
       const [proxyHost, proxyPort] = this.prxIP.split(/[:=-]/);
-      const s = await connectAndWrite(proxyHost, parseInt(proxyPort), this.fullBufferBackup);
-      remoteSocket.value = s;
-      s.on('close', () => webSocket.close()); s.on('error', () => webSocket.close());
-      this.remoteSocketToWS(s, webSocket, responseHeader, retry, log);
-    } catch(e) { await retry(); }
+      const isPortTls = proxyPort == "443" || proxyPort == "8443" || proxyPort == "2053";
+      const targetWsUrl = `${isPortTls ? 'wss' : 'ws'}://${proxyHost}:${proxyPort}${this.currentWsIncomingReq.url}`;
+      
+      log(`Option 3 Active: Dialing WebSocket Client to Worker -> ${targetWsUrl}`);
+
+      // Ambil seluruh header jabat tangan WebSocket asli dari DarkTunnel agar lolos Cloudflare
+      const forwardHeaders = { ...this.currentWsIncomingReq.headers };
+      delete forwardHeaders.host;
+      delete forwardHeaders.connection;
+      delete forwardHeaders.upgrade;
+
+      const outboundWs = new WebSocket(targetWsUrl, {
+        headers: forwardHeaders,
+        rejectUnauthorized: false
+      });
+
+      remoteSocket.value = outboundWs;
+
+      outboundWs.on('open', () => {
+        log(`WebSocket Handshake to target Worker SUCCESS!`);
+        // Kirim raw payload pertama dari DarkTunnel setelah jabat tangan di seberang sukses
+        outboundWs.send(rawClientData);
+      });
+
+      outboundWs.on('message', (data) => {
+        if (webSocket.readyState === WebSocket.OPEN) {
+          // Oper balik semua data web/streaming dari Worker luar ke aplikasi DarkTunnel
+          webSocket.send(Buffer.from(data));
+        }
+      });
+
+      outboundWs.on('close', () => webSocket.close());
+      outboundWs.on('error', (err) => {
+        log(`Outbound Worker WebSocket Error: ${err.message}`);
+        webSocket.close();
+      });
+
+    } catch (error) {
+      log(`Option 3 Failed to create client: ${error.message}`);
+      webSocket.close();
+    }
   }
 
   async handleUDPOutbound(targetAddress, targetPort, dataChunk, webSocket, responseHeader, log) {
