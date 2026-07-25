@@ -1,10 +1,10 @@
 // ============================================
 // DDFATHUVLES GATEWAY - BLUE CYBERPUNK UI TEMPLATE
-// REAL-TIME IP MONITORING LIST ADDED
+// REAL-TIME IP MONITORING & DYNAMIC TRAFFIC METRICS
 // Terpisah agar Aman dan Mudah Diedit Modifikasi
 // ============================================
 
-function generateUI(currentHost, uptime, onlineClients, totalVisits, ipList = [], visitorIP = '') {
+function generateUI(currentHost, uptime, onlineClients, totalVisits, ipList = [], visitorIP = '', downloadMB = '128.4', uploadMB = '96.2') {
   // Generate HTML untuk daftar IP aktif
   let ipListHTML = '';
   if (ipList.length === 0) {
@@ -77,16 +77,16 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits, ipList = []
       </div>
     </div>
 
-    <!-- TRAFFIC METRICS -->
+    <!-- TRAFFIC METRICS (DYNAMIC VALUES FROM SERVER) -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card-blue p-4 rounded-xl">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">DOWNLOAD</p>
-        <p id="dl-total" class="text-xl font-bold text-white mt-1">128.4 MB</p>
+        <p id="dl-total" class="text-xl font-bold text-white mt-1">${downloadMB} MB</p>
         <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">181.0 KB/s</p>
       </div>
       <div class="card-blue p-4 rounded-xl">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">UPLOAD</p>
-        <p id="ul-total" class="text-xl font-bold text-white mt-1">96.2 MB</p>
+        <p id="ul-total" class="text-xl font-bold text-white mt-1">${uploadMB} MB</p>
         <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">226.22 KB/s</p>
       </div>
     </div>
