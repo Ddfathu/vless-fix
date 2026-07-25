@@ -1,5 +1,5 @@
 // ============================================
-// RAILWAY GATEWAY - UNIVERSAL DIRECT WITH GENERATOR
+// RAILWAY GATEWAY - UNIVERSAL DIRECT + GENERATOR (FIXED)
 // UI Cyberpunk + VLESS/Trojan Generator + WebSocket + UDP
 // Ready to Deploy - Node.js
 // ============================================
@@ -61,7 +61,7 @@ class GatewayServer {
   <script src="https://cdn.tailwindcss.com"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght=300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
     body { font-family: 'JetBrains Mono', monospace; background-color: #0a0b10; }
     .cyber-glow { box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
     .cyber-glow-green { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
@@ -83,13 +83,13 @@ class GatewayServer {
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-wider text-white">RAILWAY_GATEWAY<span class="text-blue-500">.sys</span></h1>
-          <p class="text-xs text-slate-500">CORE NODE ACTIVE & UNIVERSAL MODE</p>
+          <p class="text-xs text-slate-500">CORE NODE UNIVERSAL MODE</p>
         </div>
       </div>
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2 bg-[#121420] neon-border px-4 py-2 rounded-lg">
           <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 cyber-glow-green animate-ping"></span>
-          <span class="text-xs font-semibold text-emerald-400 tracking-wider">UNIVERSAL PATHS POWERED</span>
+          <span class="text-xs font-semibold text-emerald-400 tracking-wider">DIRECT MODE ACTIVE</span>
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@ class GatewayServer {
       </div>
       <div class="bg-[#0d0e16] neon-border p-5 rounded-xl flex items-center justify-between">
         <div>
-          <p class="text-xs text-slate-500 font-medium mb-1">DYNAMIC TUNNELING</p>
+          <p class="text-xs text-slate-500 font-medium mb-1">TUNNEL STRATEGY</p>
           <p class="text-lg font-bold text-emerald-400">UNIVERSAL DIRECT</p>
         </div>
         <i class="fa-solid fa-bolt text-emerald-900/50 text-2xl"></i>
@@ -129,14 +129,14 @@ class GatewayServer {
       </div>
     </div>
 
-    <!-- EXPLANATION INFO -->
+    <!-- INFO BOX -->
     <div class="bg-[#0d0e16] border border-slate-900 rounded-xl p-6 space-y-2">
       <div class="flex items-center gap-2 text-white font-bold">
         <i class="fa-solid fa-circle-info text-blue-400"></i>
         <span>INFO MODE UNIVERSAL DIRECT</span>
       </div>
       <p class="text-xs text-slate-400 leading-relaxed">
-        Server ini berjalan dalam mode <span class="text-emerald-400 font-bold">Universal Direct</span>. Semua fitur proxy luar yang sering drop telah dihapus. Kamu bebas mengisi kolom path di aplikasi VPN dengan nama atau kata apa saja (termasuk config bawaan vmess/trojan/vless), semuanya otomatis diteruskan menggunakan IP Railway murni berkecepatan tinggi tanpa hambatan.
+        Server ini berjalan dalam mode <span class="text-emerald-400 font-bold">Universal Direct</span>. Semua fitur proxy luar yang bermasalah telah dihapus. Kamu bebas mengisi kolom path di aplikasi VPN dengan nama atau kata apa saja, semuanya otomatis terkoneksi langsung via server Railway.
       </p>
     </div>
 
@@ -175,7 +175,7 @@ class GatewayServer {
           </div>
 
           <div>
-            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Path (Bebas Ketik Apa Saja)</label>
+            <label class="text-xs text-slate-400 font-medium mb-1.5 block">Path (Bebas Isi Nama Apa Saja)</label>
             <div class="flex gap-2">
               <select id="pathSelect" 
                       class="bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
@@ -212,7 +212,7 @@ class GatewayServer {
 
           <div>
             <label class="text-xs text-slate-400 font-medium mb-1.5 block">Nama / Remark</label>
-            <input id="remarkInput" type="text" value="RAILWAY UNIVERSAL ⚡" 
+            <input id="remarkInput" type="text" value="RAILWAY STABLE ⚡" 
                    class="w-full bg-[#10121d] border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none transition">
           </div>
 
@@ -267,7 +267,7 @@ class GatewayServer {
 
   <footer class="border-t border-slate-950 bg-[#07080d] px-6 py-4 text-center text-xs text-slate-600">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <p>&copy; 2026 RAILWAY GATEWAY TERMINAL. ALL SYSTEM VECTORS STABLE.</p>
+      <p>&copy; 2026 RAILWAY GATEWAY. ALL SYSTEM OPERATIONAL.</p>
     </div>
   </footer>
 
@@ -321,17 +321,15 @@ class GatewayServer {
         const port = document.getElementById('portInput').value.trim() || '443';
         const path = document.getElementById('pathInput').value.trim() || '/DIREK';
         const sni = document.getElementById('sniInput').value.trim() || 'business.whatsapp.com';
-        const remark = document.getElementById('remarkInput').value.trim() || 'RAILWAY UNIVERSAL';
+        const remark = document.getElementById('remarkInput').value.trim() || 'RAILWAY';
         const encodedPath = encodeURIComponent(path);
         const encodedRemark = encodeURIComponent(remark);
 
-        // VLESS
         const vlessUrl = 'vless://' + uuid + '@' + host + ':' + port +
                          '?encryption=none&security=tls&sni=' + sni +
                          '&fp=randomized&type=ws&host=' + host +
                          '&path=' + encodedPath + '#' + encodedRemark;
 
-        // TROJAN
         const trojanPass = generateTrojanPass();
         const trojanUrl = 'trojan://' + trojanPass + '@' + host + ':' + port +
                           '?security=tls&sni=' + sni +
@@ -341,7 +339,6 @@ class GatewayServer {
         document.getElementById('vlessOutput').textContent = vlessUrl;
         document.getElementById('trojanOutput').textContent = trojanUrl;
 
-        // CLASH META
         document.getElementById('clashOutput').textContent = 
           '- name: "' + remark + ' VLESS"\\n' +
           '  type: vless\\n' +
@@ -373,7 +370,6 @@ class GatewayServer {
       } catch(err) { console.error('Generator Error:', err); }
     }
 
-    // Init listeners
     setTimeout(generateAccounts, 300);
     setTimeout(() => {
       ['uuidInput','hostInput','portInput','pathInput','sniInput','remarkInput'].forEach(id => {
@@ -427,9 +423,9 @@ class GatewayServer {
     } catch (err) { response.writeHead(500); response.end(); }
   }
 
-  // ==================== WEBSOCKET UNIVERSAL DIRECT HANDLERS ====================
+  // ==================== WEBSOCKET HANDLERS (UNIVERSAL DIRECT FIXED) ====================
   async handleWebSocketConnection(ws, request) {
-    // Mode Universal: Menerima koneksi WebSocket dari path kata apa saja tanpa pengecekan ketat
+    // Mode Universal: Menerima path apapun untuk dilarikan langsung ke internet via server Railway
     console.log(`Universal WS accepted via path: ${url.parse(request.url).pathname}`);
     await this.websocketHandler(ws);
   }
@@ -480,17 +476,18 @@ class GatewayServer {
     return "ss";
   }
 
-  // ==================== 100% PURE DIRECT OUTBOUND ====================
   async handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, responseHeader, log) {
+    // Balik ke logic asli bawaan temen lu yang dijamin nembus lurus
+    const connectAndWrite = (address, port) => new Promise((resolve, reject) => {
+      const s = net.createConnection({ host: address, port }, () => { log(`connected to ${address}:${port}`); s.write(rawClientData); resolve(s); });
+      s.on('error', reject);
+    });
     try {
-      const s = net.createConnection({ host: addressRemote, port: portRemote }, () => {
-        log(`universal direct tunnel opened to ${addressRemote}:${portRemote}`);
-        s.write(rawClientData);
-      });
+      const s = await connectAndWrite(addressRemote, portRemote);
       remoteSocket.value = s;
       s.on('close', () => webSocket.close());
       s.on('error', () => webSocket.close());
-      this.remoteSocketToWS(s, webSocket, responseHeader, log);
+      this.remoteSocketToWS(s, webSocket, responseHeader, null, log); // <--- Parameter log dipasang pas
     } catch (e) { webSocket.close(); }
   }
 
@@ -561,13 +558,16 @@ class GatewayServer {
     return { hasError: false, addressRemote: av, portRemote: pr, rawDataIndex: pi+4, rawClientData: db.slice(pi+4), version: null, isUDP: udp };
   }
 
-  remoteSocketToWS(remoteSocket, webSocket, responseHeader, log) {
-    let header = responseHeader;
+  // Balikkan fungsi core pembaca data asli bawaan temen lu tanpa modifikasi rusak
+  remoteSocketToWS(remoteSocket, webSocket, responseHeader, retry, log) {
+    let header = responseHeader, hasData = false;
     remoteSocket.on('data', (chunk) => {
+      hasData = true;
       if (webSocket.readyState !== WebSocket.OPEN) { remoteSocket.destroy(); return; }
       if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; }
       else webSocket.send(chunk);
     });
+    remoteSocket.on('close', () => { if (!hasData && retry) retry(); });
   }
 
   start(port = process.env.PORT || 3000) {
