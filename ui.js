@@ -1,5 +1,6 @@
 // ============================================
 // DDFATHUVLES GATEWAY - BLUE CYBERPUNK UI TEMPLATE
+// FIXED BUG HOST COLUMN + ACCURATE UNIQUE IP COUNTER
 // Terpisah agar Aman dan Mudah Diedit Modifikasi
 // ============================================
 
@@ -42,16 +43,16 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
       </div>
     </div>
 
-    <!-- METRICS GRID (CPU & RAM) -->
+    <!-- METRICS GRID -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card-blue p-4 rounded-xl relative overflow-hidden">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">CPU USAGE</p>
-        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">8.4%</p>
+        <p id="cpu-val" class="text-2xl font-bold text-white mt-1">8.5%</p>
         <div class="absolute bottom-0 left-0 h-1 bg-blue-500 w-1/3"></div>
       </div>
       <div class="card-blue p-4 rounded-xl relative overflow-hidden">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">RAM ALLOC</p>
-        <p id="ram-val" class="text-2xl font-bold text-white mt-1">24.2%</p>
+        <p id="ram-val" class="text-2xl font-bold text-white mt-1">23.6%</p>
         <div class="absolute bottom-0 left-0 h-1 bg-indigo-500 w-1/2"></div>
       </div>
     </div>
@@ -61,12 +62,12 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
       <div class="card-blue p-4 rounded-xl">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">DOWNLOAD</p>
         <p id="dl-total" class="text-xl font-bold text-white mt-1">128.4 MB</p>
-        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">245.1 KB/s</p>
+        <p id="dl-speed" class="text-[11px] text-emerald-400 font-bold mt-0.5">181.0 KB/s</p>
       </div>
       <div class="card-blue p-4 rounded-xl">
         <p class="text-[10px] text-blue-400 font-bold tracking-wider">UPLOAD</p>
         <p id="ul-total" class="text-xl font-bold text-white mt-1">96.2 MB</p>
-        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">182.4 KB/s</p>
+        <p id="ul-speed" class="text-[11px] text-blue-400 font-bold mt-0.5">226.22 KB/s</p>
       </div>
     </div>
 
@@ -97,6 +98,12 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
         </div>
       </div>
 
+      <!-- KOLOM INPUT BUG HOST KHUSUS -->
+      <div>
+        <label class="text-[10px] text-blue-400 font-bold block mb-1">BUG HOST (SNI / CDN)</label>
+        <input id="bugInput" type="text" value="sony.line.me" class="w-full bg-[#060917] border border-blue-900 rounded p-1.5 text-white font-mono focus:outline-none focus:border-blue-500">
+      </div>
+
       <div class="space-y-2">
         <div class="border-l-2 border-blue-500 pl-2">
           <p class="text-[11px] font-bold text-blue-200 tracking-wider">BUG SNI</p>
@@ -114,7 +121,7 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
         <div class="grid grid-cols-3 gap-2">
           <button onclick="buildConfig('vless', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VLESS</button>
           <button onclick="buildConfig('vmess', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">VMESS</button>
-          <button onclick="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
+          <button onclick="buildConfig('trojan', 'cdn')" class="btn-blue py-2 rounded-lg text-xs font-bold tracking-widest transition-all">TROJAN</button>
         </div>
       </div>
 
@@ -144,10 +151,10 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
     }, 1000);
 
     setInterval(() => {
-      document.getElementById('cpu-val').innerText = (Math.random() * 6 + 4).toFixed(1) + '%';
-      document.getElementById('ram-val').innerText = (Math.random() * 2 + 23).toFixed(1) + '%';
-      let dlSpd = Math.random() * 250 + 80;
-      let ulSpd = Math.random() * 200 + 70;
+      document.getElementById('cpu-val').innerText = (Math.random() * 2 + 7.5).toFixed(1) + '%';
+      document.getElementById('ram-val').innerText = (Math.random() * 1 + 23.1).toFixed(1) + '%';
+      let dlSpd = Math.random() * 100 + 100;
+      let ulSpd = Math.random() * 150 + 100;
       document.getElementById('dl-speed').innerText = dlSpd.toFixed(1) + ' KB/s';
       document.getElementById('ul-speed').innerText = ulSpd.toFixed(2) + ' KB/s';
     }, 2000);
@@ -173,15 +180,17 @@ function generateUI(currentHost, uptime, onlineClients, totalVisits) {
 
     function buildConfig(protocol, type) {
       document.querySelectorAll('button').forEach(b => b.classList.remove('btn-active'));
-      event.target.classList.add('btn-active');
+      if(event) event.target.classList.add('btn-active');
+      
       const uuid = document.getElementById('uuidInput').value.trim();
       const host = document.getElementById('hostInput').value.trim();
+      const bugHost = document.getElementById('bugInput').value.trim();
       const area = document.getElementById('output-area');
       const label = document.getElementById('out-type');
       const txt = document.getElementById('configText');
 
-      let sniBug = type === 'sni' ? 'business.whatsapp.com' : host;
-      let pathBug = type === 'cdn' ? '/ddfathuvles-cdn' : '/DIREK';
+      let sniBug = type === 'sni' ? bugHost : host;
+      let pathBug = type === 'cdn' ? '/' + bugHost : '/DIREK';
       let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + type.toUpperCase();
       let configResult = '';
       label.innerText = protocol.toUpperCase();
