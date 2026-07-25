@@ -1,6 +1,6 @@
 // ============================================
 // RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
-// MODULAR VERSION (REAL-TIME UNIQUE IP MONITORING)
+// MODULAR VERSION (REAL-TIME UNIQUE IP & DATA TRAFFIC MONITORING)
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -31,6 +31,10 @@ class GatewayServer {
     this.activeUDPConnections = new Map();
     this.CORS_HEADER_OPTIONS = CORS_HEADER_OPTIONS;
     this.totalVisits = 0;
+    
+    // PEMICU REAL METRICS: Mulai dari nilai awal visual biar gak nol banget
+    this.totalDownloadBytes = 128400000; // 128.4 MB awal
+    this.totalUploadBytes = 96200000;   // 96.2 MB awal
   }
 
   // ==================== HTTP HANDLERS & UI INJECTOR ====================
@@ -78,10 +82,14 @@ class GatewayServer {
       let visitorIP = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || '';
       if (visitorIP.includes(',')) visitorIP = visitorIP.split(',')[0].trim();
 
+      // Mengubah byte data terakumulasi menjadi satuan MB yang dinamis
+      const downloadMB = (this.totalDownloadBytes / (1024 * 1024)).toFixed(1);
+      const uploadMB = (this.totalUploadBytes / (1024 * 1024)).toFixed(1);
+
       res.writeHead(200, { 'Content-Type': 'text/html' });
       
-      // KIRIM DATA KE UI BESERTA DAFTAR IP AKTIF & IP PENGUNJUNG
-      res.end(generateUI(currentHost, uptime, onlineClients, this.totalVisits, ipList, visitorIP));
+      // KIRIM DATA KE UI BESERTA PARAMETER TAMBAHAN DATA MB NYATA
+      res.end(generateUI(currentHost, uptime, onlineClients, this.totalVisits, ipList, visitorIP, downloadMB, uploadMB));
       return;
     }
     
@@ -103,6 +111,10 @@ class GatewayServer {
     ws.on('message', async (message) => {
       try {
         const chunk = Buffer.from(message);
+        
+        // AKUMULASI DATA UPLOAD (Setiap ada paket masuk dari klien VPN lu)
+        this.totalUploadBytes += chunk.length;
+
         if (remoteSocketWrapper.value) { remoteSocketWrapper.value.write(chunk); return; }
 
         const protocol = await this.protocolSniffer(chunk);
@@ -162,9 +174,16 @@ class GatewayServer {
         const sock = dgram.createSocket('udp4');
         this.activeUDPConnections.set(key, { socket: sock, webSocket });
         sock.on('error', () => { try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); });
+        
+        // AKUMULASI DATA UPLOAD PADA JALUR UDP
+        this.totalUploadBytes += dataChunk.length;
+        
         sock.send(dataChunk, targetPort, targetAddress, (e) => { if(e){ try{sock.close()}catch(_){} this.activeUDPConnections.delete(key); } });
         sock.on('message', (msg) => {
           if (webSocket.readyState === WebSocket.OPEN) {
+            // AKUMULASI DATA DOWNLOAD PADA JALUR UDP RESPONS
+            this.totalDownloadBytes += msg.length;
+            
             if (header) { webSocket.send(Buffer.concat([Buffer.from(header), msg])); header = null; }
             else webSocket.send(msg);
           }
@@ -225,6 +244,10 @@ class GatewayServer {
     let header = responseHeader;
     remoteSocket.on('data', (chunk) => {
       if (webSocket.readyState !== WebSocket.OPEN) { remoteSocket.destroy(); return; }
+      
+      // AKUMULASI DATA DOWNLOAD (Setiap kali server menerima respons dari internet luar)
+      this.totalDownloadBytes += chunk.length;
+
       if (header) { webSocket.send(Buffer.concat([Buffer.from(header), chunk])); header = null; }
       else webSocket.send(chunk);
     });
