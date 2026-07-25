@@ -8,7 +8,7 @@ Proxy server yang mendukung WebSocket dengan protokol Trojan, VMess, dan Shadows
 - ✅ TCP tunneling
 - ✅ UDP native (tanpa relay eksternal)
 - ✅ Reverse proxy HTTP
-- ✅ koneksi agro tunnel
+- ✅ koneksi agro tunnel pke port 8080
 - ✅ vles direk
 - 👍ui trrpisah denga server js bisa ubah ui lbih mudah tanpa takut logika vles rusak 💔
 
