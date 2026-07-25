@@ -1,6 +1,6 @@
 // ============================================
 // RAILWAY GATEWAY - UNIVERSAL DIRECT HIGH-PERFORMANCE
-// MODULAR VERSION (UI SEPARATED TO ui.js)
+// MODULAR VERSION (REAL-TIME UNIQUE IP MONITORING)
 // Ready to Deploy - Node.js
 // ============================================
 
@@ -58,39 +58,35 @@ class GatewayServer {
       const currentHost = req.headers.host || 'localhost:3000';
       const uptime = Math.floor(process.uptime());
       
-      // LOGIKA AKURASI BARU: Membagi total koneksi paralel multiplexing perangkat
-      // Tanpa merubah socket asli, data dibulatkan secara logis per rumpun koneksi aktif
-      const rawConnections = this.wss ? this.wss.clients.size : 0;
-      const onlineClients = rawConnections > 0 ? Math.ceil(rawConnections / 28) : 0;
+      // ========================================================
+      // REAL-TIME: MENGHITUNG DAN MENGAMBIL DAFTAR IP AKTIF
+      // ========================================================
+      const activeIPs = new Set();
       
+      if (this.wss && this.wss.clients) {
+        this.wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN && client.remoteRealIP) {
+            activeIPs.add(client.remoteRealIP);
+          }
+        });
+      }
+      
+      const ipList = Array.from(activeIPs);
+      const onlineClients = ipList.length || 1;
+      
+      // Deteksi IP publik browser lu saat ini untuk penanda "(You)"
+      let visitorIP = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || '';
+      if (visitorIP.includes(',')) visitorIP = visitorIP.split(',')[0].trim();
+
       res.writeHead(200, { 'Content-Type': 'text/html' });
       
-      // LOGIKA UI KITA PANGGIL SECARA DINAMIS DARI FILE ui.js
-      res.end(generateUI(currentHost, uptime, onlineClients, this.totalVisits));
+      // KIRIM DATA KE UI BESERTA DAFTAR IP AKTIF & IP PENGUNJUNG
+      res.end(generateUI(currentHost, uptime, onlineClients, this.totalVisits, ipList, visitorIP));
       return;
     }
     
-    const targetReversePrx = process.env.REVERSE_PRX_TARGET;
-    if (targetReversePrx) { await this.reverseWeb(req, res, targetReversePrx); } 
-    else { res.writeHead(404); res.end('Not Found'); }
-  }
-
-  async reverseWeb(request, response, target, targetPath) {
-    try {
-      const targetUrl = new URL(request.url);
-      const targetChunk = target.split(":");
-      targetUrl.hostname = targetChunk[0];
-      targetUrl.port = targetChunk[1] || "443";
-      const options = {
-        hostname: targetUrl.hostname, port: targetUrl.port,
-        path: (targetPath || targetUrl.pathname) + targetUrl.search, method: request.method,
-        headers: { ...request.headers, host: targetUrl.hostname }
-      };
-      const proxyReq = https.request(options, (proxyRes) => {
-        response.writeHead(proxyRes.statusCode, proxyRes.headers); proxyRes.pipe(response);
-      });
-      request.pipe(proxyReq);
-    } catch (err) { response.writeHead(500); response.end(); }
+    res.writeHead(404);
+    res.end('Not Found');
   }
 
   // ==================== WEBSOCKET HANDLERS (MURNI 1000% LOGIKA SAKTI LU) ====================
@@ -237,7 +233,18 @@ class GatewayServer {
   start(port = process.env.PORT || 3000) {
     const server = http.createServer((req, res) => { this.handleHttpRequest(req, res).catch(() => {}); });
     this.wss = new WebSocket.Server({ server, perMessageDeflate: false });
-    this.wss.on('connection', (ws, req) => { this.handleWebSocketConnection(ws, req); });
+    
+    // MENANGKAP IP PUBLIK ASLI DARITUNNEL SAAT JABAT TANGAN (HANDSHAKE)
+    this.wss.on('connection', (ws, req) => {
+      let clientIP = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || '';
+      if (clientIP.includes(',')) {
+        clientIP = clientIP.split(',')[0].trim();
+      }
+      ws.remoteRealIP = clientIP; // Simpan IP asli unik ke objek ws
+      
+      this.handleWebSocketConnection(ws, req);
+    });
+    
     server.listen(port, '0.0.0.0', () => { this.httpServer = server; });
   }
 }
