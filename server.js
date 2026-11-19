@@ -61,13 +61,34 @@ class RawStreamAdapter extends EventEmitter {
 
   _flushFirst() {
     if (this._firstFlushed) return;
-    this._firstFlushed = true;
     if (this._flushTimer) { clearTimeout(this._flushTimer); this._flushTimer = null; }
-    if (this._firstChunks.length) {
-      const buf = Buffer.concat(this._firstChunks);
-      this._firstChunks = [];
-      this.emit('message', buf);
+    if (!this._firstChunks.length) { this._firstFlushed = true; return; }
+    let buf = Buffer.concat(this._firstChunks);
+    // Penjaga template injek: blok response palsu ("HTTP/ 200 OK\r\n\r\n")
+    // bisa tiba di depan data tunnel pada stream mentah (dikirim klien
+    // sesudah [split], yaitu sesudah handoff front-end). Buang satu blok
+    // header di awal bila stream diawali "HTTP/".
+    if (buf.length >= 5 && buf.toString('latin1', 0, 5) === 'HTTP/') {
+      const end = buf.indexOf('\r\n\r\n');
+      if (end === -1 && buf.length < 8192) {
+        // Blok palsu belum utuh: tahan dulu, tunggu lanjutan.
+        this._flushTimer = setTimeout(() => this._flushFirst(), 30);
+        return;
+      }
+      if (end !== -1) {
+        buf = buf.subarray(end + 4);
+        this._firstChunks = buf.length ? [buf] : [];
+        this._firstBytes = buf.length;
+        if (!buf.length) {
+          // Baru blok palsu saja; tunggu data tunnel aslinya.
+          this._flushTimer = setTimeout(() => this._flushFirst(), 30);
+          return;
+        }
+      }
     }
+    this._firstFlushed = true;
+    this._firstChunks = [];
+    this.emit('message', buf);
   }
 
   send(data) {
@@ -896,59 +917,135 @@ class GatewayServer {
     });
   }
 
-  // ==================== PAYLOAD-ENHANCED FRONT-END ====================
-  // Listener TCP mentah yang duduk di depan HTTP server (pola dari
-  // ws-xray.js di panel vmesssh3-fix, diadaptasi: di sini socket yang
-  // sudah bersih diserahkan ke HTTP server sendiri, bukan ke Xray).
-  // Klien injek "payload enhanced" mengirim byte sampah / request umpan
-  // SEBELUM request WebSocket/HTTPUpgrade asli di koneksi yang sama;
-  // parser HTTP Node langsung tersedak sampah itu. Front-end ini:
-  //   1. Request bersih di offset 0 -> langsung serahkan apa adanya.
-  //   2. Ada sampah/umpan di depan -> scan request GET yang blok
-  //      headernya mengandung "Upgrade:", buang semua byte sebelumnya,
-  //      serahkan sisanya. Berlaku buat WS maupun HTTPUpgrade.
-  //   3. Buffer scan dibatasi (default 64 KB) + timeout ngendus
-  //      (default 10 detik); lewat itu tanpa keputusan -> socket dibuang.
+  // ==================== PAYLOAD-ENHANCED FRONT-END v2 ====================
+  // Listener TCP mentah di depan HTTP server (pola ws-xray.js dari panel
+  // vmesssh3-fix, diadaptasi: socket bersih diserahkan ke HTTP server
+  // sendiri, bukan ke Xray). Front-end v2 memindai stream sebagai
+  // RANGKAIAN blok header HTTP (tiap blok diakhiri \r\n\r\n):
+  //   - Blok "kandidat" = blok request yang headernya mengandung
+  //     "Upgrade:". Blok ASLI = kandidat pertama yang path-nya masuk
+  //     allowlist PAYLOAD_PATHS (default "/direk"); kalau tidak ada,
+  //     kandidat terakhir di buffer. Blok sebelum blok asli dibuang.
+  //   - Blok asli DENGAN Sec-WebSocket-Key -> serahkan byte-preserving
+  //     mulai dari blok itu (klien WS beneran).
+  //   - Blok asli TANPA key (pola payload injek asli user: request umpan
+  //     GET ber-Upgrade di offset 0, lalu blok PATCH [path] tanpa key)
+  //     -> request upgrade bersih DISINTESIS (GET + Host + Upgrade +
+  //     Connection: Upgrade, sengaja TANPA Sec-WebSocket-Key) supaya
+  //     router lama mengambil jalur raw/HTTPUpgrade dan membalas 101.
+  //   - Setelah blok asli, satu blok mirip-response ("HTTP/...") dibuang
+  //     (response palsu "[split] HTTP/ 200 OK" dari template injek);
+  //     sisanya yang lolos ke raw stream dijaga juga di RawStreamAdapter.
+  //   - HTTP biasa bersih di offset 0 (UI / health / api) dan WS asli di
+  //     offset 0 diteruskan seketika. Scan dibatasi (default 64 KB) +
+  //     timeout ngendus (default 10 detik); sampah tanpa keputusan
+  //     dibuang. PAYLOAD_ENHANCED=0 mematikan front-end ini.
   createPayloadFrontend(httpServer) {
     const MAX_SCAN = parseInt(process.env.PAYLOAD_MAX_SCAN_BYTES || '', 10) || 64 * 1024;
     const TIMEOUT_MS = parseInt(process.env.PAYLOAD_SNIFF_TIMEOUT_MS || '', 10) || 10000;
-    const REQ_LINE_RE = /^([A-Z][A-Z0-9!#$%&'*+.^_`|~-]*) ([^ \r\n]+) HTTP\/1\.[01]\r\n$/;
-    const GET_LINE_RE = /^GET [^ \r\n]+ HTTP\/1\.[01]\r\n$/;
+    const GRACE_MS = 300;
+    const ALLOW_PATHS = (process.env.PAYLOAD_PATHS || '/direk')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+    const REQ_LINE_RE = /^([A-Z][A-Z0-9!#$%&'*+.^_`|~-]*) ([^ \r\n]+) HTTP\/1\.[01]$/;
 
-    // Offset akhir blok header (setelah \r\n\r\n) mulai dari `from`, -1 bila belum utuh.
     function blockEndOf(buf, from) {
       const i = buf.indexOf('\r\n\r\n', from);
       return i === -1 ? -1 : i + 4;
     }
 
-    // Cari request GET yang blok headernya mengandung header Upgrade.
-    // Return: offset awal request line, -1 = kandidat ada tapi blok belum
-    // utuh, -2 = tidak ada kandidat sama sekali.
-    function findUpgrade(buf, from) {
-      let idx = buf.indexOf('GET ', from);
-      while (idx !== -1) {
-        const lineEnd = buf.indexOf('\r\n', idx);
-        if (lineEnd === -1) return -1;
-        const line = buf.toString('latin1', idx, lineEnd + 2);
-        if (GET_LINE_RE.test(line)) {
-          const end = blockEndOf(buf, idx);
-          if (end === -1) return -1;
-          if (buf.toString('latin1', idx, end).toLowerCase().includes('upgrade:')) return idx;
-        }
-        idx = buf.indexOf('GET ', idx + 4);
+    function pathOf(target) {
+      if (/^https?:\/\//i.test(target)) {
+        try { return new URL(target).pathname || '/'; } catch (_) { return '/'; }
       }
-      return -2;
+      const p = target.split('?')[0];
+      return p || '/';
+    }
+
+    // Bisakah `s` (sisa buffer tanpa \r\n) menjadi awalan sebuah blok?
+    function couldBeBlockPrefix(s) {
+      if (!s.length) return true;
+      if ('HTTP/'.startsWith(s)) return true;
+      if (/^[A-Z]{1,24}$/.test(s)) return true;        // metode kepotong
+      if (/^[A-Z]+ [^ \r\n]*$/.test(s)) return true;   // request line kepotong
+      return false;
+    }
+
+    // Parse satu blok mulai PERSIS di pos. Hasil:
+    // {kind:'request'|'response', start, end, ...} blok utuh,
+    // {kind:'incomplete'} mulai seperti blok tapi belum utuh,
+    // {kind:'prefix'} sisa buffer bisa jadi awalan blok,
+    // {kind:'none'} bukan awal blok.
+    function parseBlockAt(buf, pos) {
+      const lineEnd = buf.indexOf('\r\n', pos);
+      if (lineEnd === -1) {
+        const rest = buf.toString('latin1', pos);
+        return { kind: couldBeBlockPrefix(rest) ? 'prefix' : 'none', start: pos };
+      }
+      const line = buf.toString('latin1', pos, lineEnd);
+      if (line.startsWith('HTTP/')) {
+        const end = blockEndOf(buf, pos);
+        return end === -1 ? { kind: 'incomplete', start: pos } : { kind: 'response', start: pos, end };
+      }
+      const m = line.match(REQ_LINE_RE);
+      if (!m) return { kind: 'none', start: pos };
+      const end = blockEndOf(buf, pos);
+      if (end === -1) return { kind: 'incomplete', start: pos };
+      const head = buf.toString('latin1', pos, end);
+      const lines = head.split('\r\n');
+      let isCandidate = false, hasKey = false, host = '';
+      for (let i = 1; i < lines.length; i++) {
+        const L = lines[i];
+        if (/^upgrade\s*:/i.test(L)) isCandidate = true;
+        else if (/^sec-websocket-key\s*:/i.test(L)) hasKey = true;
+        else if (!host) { const hm = L.match(/^host\s*:\s*(.+)$/i); if (hm) host = hm[1].trim(); }
+      }
+      return {
+        kind: 'request', start: pos, end,
+        method: m[1], target: m[2], path: pathOf(m[2]),
+        isCandidate, hasKey, host,
+      };
+    }
+
+    // Offset awal blok berikutnya pada/di belakang `from`, -1 bila tidak ada.
+    function findBlockStart(buf, from) {
+      let best = -1;
+      for (const t of METHODS) {
+        const i = buf.indexOf(t + ' ', from);
+        if (i !== -1 && (best === -1 || i < best)) best = i;
+      }
+      const h = buf.indexOf('HTTP/', from);
+      if (h !== -1 && (best === -1 || h < best)) best = h;
+      return best;
+    }
+
+    // Buang satu blok mirip response di awal `rest` (blok "HTTP/ 200 OK"
+    // palsu dari template injek) bila sudah ter-buffer utuh.
+    function stripFakeResponse(rest) {
+      if (rest.length >= 5 && rest.toString('latin1', 0, 5) === 'HTTP/') {
+        const end = blockEndOf(rest, 0);
+        if (end !== -1) return rest.subarray(end);
+      }
+      return rest;
     }
 
     return net.createServer((socket) => {
       socket.setNoDelay(true);
       let buf = Buffer.alloc(0);
       let decided = false;
+      let graceTimer = null;
+      let lastCandidates = [];
 
-      const timer = setTimeout(fail, TIMEOUT_MS);
+      const timer = setTimeout(() => {
+        // Timeout total: rangkaian multi-kandidat -> kandidat terakhir,
+        // selain itu buang.
+        if (!decided && lastCandidates.length >= 2) handoffBlock(lastCandidates[lastCandidates.length - 1]);
+        else fail();
+      }, TIMEOUT_MS);
 
       function cleanup() {
         clearTimeout(timer);
+        if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
         socket.removeListener('data', onData);
         socket.removeListener('error', onGone);
         socket.removeListener('close', onGone);
@@ -958,63 +1055,139 @@ class GatewayServer {
         if (decided) return;
         decided = true;
         clearTimeout(timer);
+        if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
         try { socket.destroy(); } catch (_) {}
       }
-      function onGone() { clearTimeout(timer); }
-      function onEnd() { if (!decided) { decide(); if (!decided) fail(); } }
+      function onGone() {
+        clearTimeout(timer);
+        if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+      }
+      function onEnd() {
+        if (decided) return;
+        decide();
+        if (!decided) {
+          if (lastCandidates.length) handoffBlock(lastCandidates[lastCandidates.length - 1]);
+          else fail();
+        }
+      }
 
-      function handoff(offset) {
+      // Serahkan socket ke HTTP server, stream dimulai dari byte 0 buffer.
+      function handoffRaw() {
         if (decided) return;
         decided = true;
         cleanup();
-        const rest = buf.subarray(offset);
+        const rest = buf;
         buf = null;
         if (rest.length) { try { socket.unshift(rest); } catch (_) {} }
         httpServer.emit('connection', socket);
       }
 
-      function decide() {
-        while (!decided) {
-          const lineEnd = buf.indexOf('\r\n');
-          if (lineEnd !== -1) {
-            const m = buf.toString('latin1', 0, lineEnd + 2).match(REQ_LINE_RE);
-            if (m) {
-              const blockEnd = blockEndOf(buf, 0);
-              if (blockEnd === -1) return; // blok pertama belum utuh, tunggu lanjutan
-              const head = buf.toString('latin1', 0, blockEnd).toLowerCase();
-              if (head.includes('upgrade:')) return handoff(0); // WS / h2up bersih
-              if (buf.length === blockEnd) {
-                // Blok pertama request biasa dan tidak ada byte lanjutan.
-                // Target absolute-form (http://bug/...) = pola umpan payload:
-                // buang bloknya, lanjut ngendus request aslinya.
-                if (/^https?:\/\//i.test(m[2])) { buf = buf.subarray(blockEnd); continue; }
-                return handoff(0); // HTTP biasa (UI / health / api)
-              }
-              // Ada byte setelah blok pertama: cari request upgrade di belakangnya.
-              const up = findUpgrade(buf, blockEnd);
-              if (up >= 0) return handoff(up); // umpan dibuang, request asli dipakai
-              if (up === -1) return; // blok lanjutan belum utuh, tunggu data lagi
-              return handoff(0); // pipelined HTTP biasa, biar Node yang mengurus
-            }
-          } else {
-            // Jaga-jaga request bersih LF-only: serahkan ke parser Node.
-            const lf = buf.indexOf('\n');
-            if (lf !== -1 && /^[A-Z]+ [^ \n]+ HTTP\/1\.[01]\n$/.test(buf.toString('latin1', 0, lf + 1))) {
-              return handoff(0);
-            }
-          }
-          // Diawali sampah: scan request upgrade yang tertanam di mana saja.
-          const up = findUpgrade(buf, 0);
-          if (up >= 0) return handoff(up);
-          return; // belum ada kandidat / belum utuh -> tunggu chunk berikutnya
+      // Serahkan socket dengan stream dimulai dari blok asli `b`:
+      // byte-preserving bila blok membawa Sec-WebSocket-Key, disintesis
+      // bersih bila tidak. Satu blok response palsu sesudah blok asli
+      // (bila sudah ter-buffer) dibuang.
+      function handoffBlock(b) {
+        if (decided) return;
+        decided = true;
+        cleanup();
+        const rest = stripFakeResponse(buf.subarray(b.end));
+        let out;
+        if (b.hasKey) {
+          out = Buffer.concat([buf.subarray(b.start, b.end), rest]);
+        } else {
+          const synth = 'GET ' + b.path + ' HTTP/1.1\r\n' +
+            'Host: ' + (b.host || 'localhost') + '\r\n' +
+            'Upgrade: websocket\r\n' +
+            'Connection: Upgrade\r\n\r\n';
+          out = Buffer.concat([Buffer.from(synth, 'latin1'), rest]);
         }
+        buf = null;
+        if (out.length) { try { socket.unshift(out); } catch (_) {} }
+        httpServer.emit('connection', socket);
+      }
+
+      function armGrace() {
+        if (graceTimer) return;
+        graceTimer = setTimeout(() => {
+          graceTimer = null;
+          if (!decided && lastCandidates.length >= 2) {
+            handoffBlock(lastCandidates[lastCandidates.length - 1]);
+          }
+        }, GRACE_MS);
+      }
+
+      function decide() {
+        if (decided) return;
+        // Request bersih LF-only (tanpa CRLF): serahkan ke parser Node.
+        const lf = buf.indexOf('\n');
+        if (lf !== -1 && buf.indexOf('\r\n') === -1 &&
+            /^[A-Z]+ [^ \n]+ HTTP\/1\.[01]\n$/.test(buf.toString('latin1', 0, lf + 1))) {
+          return handoffRaw();
+        }
+
+        // Parse rangkaian blok dari awal stream (sampah sebelum blok
+        // pertama dilompati; sesudah ada blok, byte bukan-blok dianggap
+        // ekor stream / data tunnel).
+        const blocks = [];
+        let pos = 0;
+        let tailStart = -1;
+        let needMore = false;
+        while (pos < buf.length) {
+          const b = parseBlockAt(buf, pos);
+          if (b.kind === 'request' || b.kind === 'response') { blocks.push(b); pos = b.end; continue; }
+          if (b.kind === 'incomplete' || b.kind === 'prefix') { needMore = true; tailStart = pos; break; }
+          // kind 'none'
+          if (!blocks.length) {
+            const ns = findBlockStart(buf, pos + 1);
+            if (ns === -1) { tailStart = pos; break; }
+            pos = ns; continue;
+          }
+          tailStart = pos; break;
+        }
+        if (pos >= buf.length) tailStart = buf.length;
+
+        const candidates = blocks.filter((b) => b.kind === 'request' && b.isCandidate);
+        lastCandidates = candidates;
+        const first = blocks[0];
+
+        if (first && first.start === 0 && first.kind === 'request') {
+          if (first.hasKey) return handoffRaw(); // WS asli di offset 0
+          if (!first.isCandidate && !candidates.length) {
+            // Request biasa. Target absolute-form = pola umpan payload:
+            // buang bloknya dan lanjut mengendus; selain itu serahkan.
+            if (/^https?:\/\//i.test(first.target)) {
+              buf = buf.subarray(first.end);
+              return decide();
+            }
+            return handoffRaw(); // HTTP biasa (UI / health / api)
+          }
+        }
+
+        // Blok asli: kandidat pertama yang path-nya masuk allowlist.
+        const allow = candidates.find((c) => ALLOW_PATHS.includes(c.path));
+        if (allow) return handoffBlock(allow);
+        // Kandidat ber-Sec-WebSocket-Key = handshake WS asli.
+        const keyed = candidates.find((c) => c.hasKey);
+        if (keyed) return handoffBlock(keyed);
+        // Byte non-blok setelah blok terakhir: stream sudah masuk data
+        // tunnel -> kandidat terakhir adalah blok aslinya.
+        if (candidates.length && tailStart !== -1 && tailStart < buf.length && !needMore) {
+          return handoffBlock(candidates[candidates.length - 1]);
+        }
+        // Rangkaian multi-kandidat yang diam: beri jeda singkat, lalu
+        // pakai kandidat terakhir (pola [split] pada template injek).
+        if (candidates.length >= 2) armGrace();
+        // Selain itu: tunggu data berikutnya / batas scan / timeout.
       }
 
       function onData(chunk) {
         if (decided) return;
         buf = Buffer.concat([buf, chunk]);
-        if (buf.length > MAX_SCAN) return fail();
         decide();
+        if (!decided && buf.length > MAX_SCAN) {
+          if (lastCandidates.length) handoffBlock(lastCandidates[lastCandidates.length - 1]);
+          else fail();
+        }
       }
 
       socket.on('data', onData);
