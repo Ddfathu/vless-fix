@@ -485,6 +485,11 @@ class GatewayServer {
     // Tempat menyimpan URL Tunnel Cloudflare terbaru
     this.currentTunnelUrl = '';
 
+    // Payload enhanced: listener TCP mentah di depan HTTP server yang
+    // membuang payload sampah/decoy di depan request WS/h2up asli.
+    // Default ON; PAYLOAD_ENHANCED=0 menonaktifkan (listen langsung).
+    this.payloadEnhanced = process.env.PAYLOAD_ENHANCED !== '0';
+
     // VMess users: cmdKey = MD5(uuidBytes || "c48619fe-8f02-49e0-b9e9-edf763e17e21")
     const vmessUuids = (process.env.VMESS_UUID || '853b8456-0c0b-4bfa-b3b4-b2619248a9bc')
       .split(',').map(s => s.trim()).filter(Boolean);
@@ -571,7 +576,8 @@ class GatewayServer {
       timestamp: new Date().toISOString(),
       service: 'ddfathuvles-gateway',
       uptime: process.uptime(),
-      tunnel: this.currentTunnelUrl || 'pending'
+      tunnel: this.currentTunnelUrl || 'pending',
+      payloadEnhanced: this.payloadEnhanced
     };
     res.writeHead(200, { 'Content-Type': 'application/json', ...this.CORS_HEADER_OPTIONS });
     res.end(JSON.stringify(healthData, null, 2));
@@ -890,6 +896,134 @@ class GatewayServer {
     });
   }
 
+  // ==================== PAYLOAD-ENHANCED FRONT-END ====================
+  // Listener TCP mentah yang duduk di depan HTTP server (pola dari
+  // ws-xray.js di panel vmesssh3-fix, diadaptasi: di sini socket yang
+  // sudah bersih diserahkan ke HTTP server sendiri, bukan ke Xray).
+  // Klien injek "payload enhanced" mengirim byte sampah / request umpan
+  // SEBELUM request WebSocket/HTTPUpgrade asli di koneksi yang sama;
+  // parser HTTP Node langsung tersedak sampah itu. Front-end ini:
+  //   1. Request bersih di offset 0 -> langsung serahkan apa adanya.
+  //   2. Ada sampah/umpan di depan -> scan request GET yang blok
+  //      headernya mengandung "Upgrade:", buang semua byte sebelumnya,
+  //      serahkan sisanya. Berlaku buat WS maupun HTTPUpgrade.
+  //   3. Buffer scan dibatasi (default 64 KB) + timeout ngendus
+  //      (default 10 detik); lewat itu tanpa keputusan -> socket dibuang.
+  createPayloadFrontend(httpServer) {
+    const MAX_SCAN = parseInt(process.env.PAYLOAD_MAX_SCAN_BYTES || '', 10) || 64 * 1024;
+    const TIMEOUT_MS = parseInt(process.env.PAYLOAD_SNIFF_TIMEOUT_MS || '', 10) || 10000;
+    const REQ_LINE_RE = /^([A-Z][A-Z0-9!#$%&'*+.^_`|~-]*) ([^ \r\n]+) HTTP\/1\.[01]\r\n$/;
+    const GET_LINE_RE = /^GET [^ \r\n]+ HTTP\/1\.[01]\r\n$/;
+
+    // Offset akhir blok header (setelah \r\n\r\n) mulai dari `from`, -1 bila belum utuh.
+    function blockEndOf(buf, from) {
+      const i = buf.indexOf('\r\n\r\n', from);
+      return i === -1 ? -1 : i + 4;
+    }
+
+    // Cari request GET yang blok headernya mengandung header Upgrade.
+    // Return: offset awal request line, -1 = kandidat ada tapi blok belum
+    // utuh, -2 = tidak ada kandidat sama sekali.
+    function findUpgrade(buf, from) {
+      let idx = buf.indexOf('GET ', from);
+      while (idx !== -1) {
+        const lineEnd = buf.indexOf('\r\n', idx);
+        if (lineEnd === -1) return -1;
+        const line = buf.toString('latin1', idx, lineEnd + 2);
+        if (GET_LINE_RE.test(line)) {
+          const end = blockEndOf(buf, idx);
+          if (end === -1) return -1;
+          if (buf.toString('latin1', idx, end).toLowerCase().includes('upgrade:')) return idx;
+        }
+        idx = buf.indexOf('GET ', idx + 4);
+      }
+      return -2;
+    }
+
+    return net.createServer((socket) => {
+      socket.setNoDelay(true);
+      let buf = Buffer.alloc(0);
+      let decided = false;
+
+      const timer = setTimeout(fail, TIMEOUT_MS);
+
+      function cleanup() {
+        clearTimeout(timer);
+        socket.removeListener('data', onData);
+        socket.removeListener('error', onGone);
+        socket.removeListener('close', onGone);
+        socket.removeListener('end', onEnd);
+      }
+      function fail() {
+        if (decided) return;
+        decided = true;
+        clearTimeout(timer);
+        try { socket.destroy(); } catch (_) {}
+      }
+      function onGone() { clearTimeout(timer); }
+      function onEnd() { if (!decided) { decide(); if (!decided) fail(); } }
+
+      function handoff(offset) {
+        if (decided) return;
+        decided = true;
+        cleanup();
+        const rest = buf.subarray(offset);
+        buf = null;
+        if (rest.length) { try { socket.unshift(rest); } catch (_) {} }
+        httpServer.emit('connection', socket);
+      }
+
+      function decide() {
+        while (!decided) {
+          const lineEnd = buf.indexOf('\r\n');
+          if (lineEnd !== -1) {
+            const m = buf.toString('latin1', 0, lineEnd + 2).match(REQ_LINE_RE);
+            if (m) {
+              const blockEnd = blockEndOf(buf, 0);
+              if (blockEnd === -1) return; // blok pertama belum utuh, tunggu lanjutan
+              const head = buf.toString('latin1', 0, blockEnd).toLowerCase();
+              if (head.includes('upgrade:')) return handoff(0); // WS / h2up bersih
+              if (buf.length === blockEnd) {
+                // Blok pertama request biasa dan tidak ada byte lanjutan.
+                // Target absolute-form (http://bug/...) = pola umpan payload:
+                // buang bloknya, lanjut ngendus request aslinya.
+                if (/^https?:\/\//i.test(m[2])) { buf = buf.subarray(blockEnd); continue; }
+                return handoff(0); // HTTP biasa (UI / health / api)
+              }
+              // Ada byte setelah blok pertama: cari request upgrade di belakangnya.
+              const up = findUpgrade(buf, blockEnd);
+              if (up >= 0) return handoff(up); // umpan dibuang, request asli dipakai
+              if (up === -1) return; // blok lanjutan belum utuh, tunggu data lagi
+              return handoff(0); // pipelined HTTP biasa, biar Node yang mengurus
+            }
+          } else {
+            // Jaga-jaga request bersih LF-only: serahkan ke parser Node.
+            const lf = buf.indexOf('\n');
+            if (lf !== -1 && /^[A-Z]+ [^ \n]+ HTTP\/1\.[01]\n$/.test(buf.toString('latin1', 0, lf + 1))) {
+              return handoff(0);
+            }
+          }
+          // Diawali sampah: scan request upgrade yang tertanam di mana saja.
+          const up = findUpgrade(buf, 0);
+          if (up >= 0) return handoff(up);
+          return; // belum ada kandidat / belum utuh -> tunggu chunk berikutnya
+        }
+      }
+
+      function onData(chunk) {
+        if (decided) return;
+        buf = Buffer.concat([buf, chunk]);
+        if (buf.length > MAX_SCAN) return fail();
+        decide();
+      }
+
+      socket.on('data', onData);
+      socket.on('error', onGone);
+      socket.on('close', onGone);
+      socket.on('end', onEnd);
+    });
+  }
+
   start(port = process.env.PORT || 3000) {
     const server = http.createServer((req, res) => { this.handleHttpRequest(req, res).catch(() => {}); });
     this.wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
@@ -931,11 +1065,21 @@ class GatewayServer {
       this.handleWebSocketConnection(adapter, req);
     });
     
-    server.listen(port, '0.0.0.0', () => { 
+    const onListening = () => {
       this.httpServer = server;
       // Otomatis spawn cloudflared begitu HTTP server listening
       this.startCloudflared(port);
-    });
+    };
+
+    if (this.payloadEnhanced) {
+      // Mode payload enhanced: HTTP server TIDAK listen langsung; front-end
+      // TCP mentah yang listen di port eksternal dan menyerahkan socket
+      // bersih ke HTTP server lewat emit('connection').
+      this.frontServer = this.createPayloadFrontend(server);
+      this.frontServer.listen(port, '0.0.0.0', onListening);
+    } else {
+      server.listen(port, '0.0.0.0', onListening);
+    }
   }
 }
 
